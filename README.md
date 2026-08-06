@@ -4,7 +4,7 @@ LSW Audio Diagnostics Core is a compact C++17 static library for real-time-safe 
 
 Developed and maintained under the Liquid Signal Works name.
 
-Version: 0.2.0
+Version: 0.3.0
 
 ![LSW Audio Diagnostics Core v0.2.0 dashboard example](docs/images/v0.2-dashboard.png)
 
@@ -12,6 +12,8 @@ Version: 0.2.0
 
 ## Features
 
+- **New in v0.3.0**: Offline WAV Analyzer CLI (`lsw_audio_diagnostics_cli`) providing deterministic JSON reports.
+- **New in v0.3.0**: Streaming WAV Reader (PCM and IEEE Float, `WAVE_FORMAT_EXTENSIBLE`).
 - Float and double processing
 - Sample peak, Peak Hold with sample-time-based decay, accumulated maximum absolute sample, smoothed RMS, dBFS, and DC offset
 - Clip, silence, NaN, positive/negative infinity, and denormal detection
@@ -33,12 +35,14 @@ cmake -S . -B build `
   -A x64 `
   -DLSW_AUDIO_DIAG_BUILD_TESTS=ON `
   -DLSW_AUDIO_DIAG_BUILD_EXAMPLES=ON `
+  -DLSW_AUDIO_DIAG_BUILD_CLI=ON `
   -DLSW_AUDIO_DIAG_BUILD_WINDOWS_DASHBOARD=ON `
   -DLSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS=ON
 
 cmake --build build --config Release --clean-first
 ctest --test-dir build -C Release --output-on-failure
 .\build\Release\lsw_audio_diagnostics_example.exe
+.\build\Release\lsw_audio_diagnostics_cli.exe --help
 ```
 
 On Linux or macOS, omit the Visual Studio generator and use `-DCMAKE_BUILD_TYPE=Release`.
