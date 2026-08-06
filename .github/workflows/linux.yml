@@ -27,6 +27,7 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           -DLSW_AUDIO_DIAG_BUILD_TESTS=ON
           -DLSW_AUDIO_DIAG_BUILD_EXAMPLES=ON
+          -DLSW_AUDIO_DIAG_BUILD_CLI=ON
           -DLSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS=ON
       - name: Release clean build
         run: cmake --build build --clean-first
