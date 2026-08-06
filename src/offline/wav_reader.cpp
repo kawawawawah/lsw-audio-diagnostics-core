@@ -5,6 +5,7 @@
 #include <cstring>
 #include <limits>
 #include <filesystem>
+#include <algorithm>
 
 namespace lsw::audio_diag::offline
 {
@@ -12,16 +13,19 @@ namespace lsw::audio_diag::offline
     {
         std::uint16_t readU16LE(const std::uint8_t* data)
         {
-            return static_cast<std::uint16_t>(data[0]) |
-                   (static_cast<std::uint16_t>(data[1]) << 8);
+            const std::uint32_t b0 = static_cast<std::uint32_t>(data[0]);
+            const std::uint32_t b1 = static_cast<std::uint32_t>(data[1]);
+            const std::uint32_t val = b0 | (b1 << 8);
+            return static_cast<std::uint16_t>(val);
         }
 
         std::uint32_t readU32LE(const std::uint8_t* data)
         {
-            return static_cast<std::uint32_t>(data[0]) |
-                   (static_cast<std::uint32_t>(data[1]) << 8) |
-                   (static_cast<std::uint32_t>(data[2]) << 16) |
-                   (static_cast<std::uint32_t>(data[3]) << 24);
+            const std::uint32_t b0 = static_cast<std::uint32_t>(data[0]);
+            const std::uint32_t b1 = static_cast<std::uint32_t>(data[1]);
+            const std::uint32_t b2 = static_cast<std::uint32_t>(data[2]);
+            const std::uint32_t b3 = static_cast<std::uint32_t>(data[3]);
+            return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
         }
 
         constexpr std::uint16_t FORMAT_PCM = 0x0001;
@@ -103,17 +107,38 @@ namespace lsw::audio_diag::offline
         std::uint16_t bitsPerSample = 0;
         std::uint16_t validBitsPerSample = 0;
 
-        while (true)
+        std::uint64_t chunkHeaderOffset = 12;
+
+        while (chunkHeaderOffset < riffEndOffset)
         {
+            std::uint64_t chunkDataOffset = 0;
+            if (!checkedAdd(chunkHeaderOffset, 8, chunkDataOffset)) return { WavReaderError::malformed_file, {} };
+            if (chunkDataOffset > riffEndOffset) return { WavReaderError::malformed_file, {} };
+
+            if (chunkHeaderOffset > static_cast<std::uint64_t>(std::numeric_limits<std::streamoff>::max()))
+                return { WavReaderError::malformed_file, {} };
+
+            file_.clear();
+            file_.seekg(static_cast<std::streamoff>(chunkHeaderOffset), std::ios::beg);
+
             std::uint8_t chunkHeader[8];
             if (!file_.read(reinterpret_cast<char*>(chunkHeader), 8))
             {
-                if (file_.eof()) break; // end of file correctly reached maybe, but need data chunk
-                return { WavReaderError::read_failed, {} };
+                return { WavReaderError::malformed_file, {} };
             }
 
             std::uint32_t chunkSize = readU32LE(chunkHeader + 4);
             std::string chunkId(reinterpret_cast<char*>(chunkHeader), 4);
+
+            std::uint64_t chunkDataEnd = 0;
+            if (!checkedAdd(chunkDataOffset, chunkSize, chunkDataEnd)) return { WavReaderError::malformed_file, {} };
+
+            std::uint64_t padding = chunkSize % 2;
+            std::uint64_t paddedChunkEnd = 0;
+            if (!checkedAdd(chunkDataEnd, padding, paddedChunkEnd)) return { WavReaderError::malformed_file, {} };
+
+            if (paddedChunkEnd > riffEndOffset || paddedChunkEnd > physicalFileSize)
+                return { WavReaderError::malformed_file, {} };
 
             if (chunkId == "fmt ")
             {
@@ -122,26 +147,30 @@ namespace lsw::audio_diag::offline
 
                 if (chunkSize < 16) return { WavReaderError::malformed_file, {} };
 
-                std::vector<std::uint8_t> fmtData(chunkSize);
-                if (!file_.read(reinterpret_cast<char*>(fmtData.data()), chunkSize))
+                std::uint8_t fmtBuf[40] = {};
+                std::size_t bytesToReadFromFmt = static_cast<std::size_t>(std::min<std::uint64_t>(chunkSize, 40));
+                if (bytesToReadFromFmt > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max()))
                     return { WavReaderError::malformed_file, {} };
 
-                formatTag = readU16LE(fmtData.data());
-                channels = readU16LE(fmtData.data() + 2);
-                sampleRate = readU32LE(fmtData.data() + 4);
-                byteRate = readU32LE(fmtData.data() + 8);
-                blockAlign = readU16LE(fmtData.data() + 12);
-                bitsPerSample = readU16LE(fmtData.data() + 14);
+                if (!file_.read(reinterpret_cast<char*>(fmtBuf), static_cast<std::streamsize>(bytesToReadFromFmt)))
+                    return { WavReaderError::malformed_file, {} };
+
+                formatTag = readU16LE(fmtBuf);
+                channels = readU16LE(fmtBuf + 2);
+                sampleRate = readU32LE(fmtBuf + 4);
+                byteRate = readU32LE(fmtBuf + 8);
+                blockAlign = readU16LE(fmtBuf + 12);
+                bitsPerSample = readU16LE(fmtBuf + 14);
                 validBitsPerSample = bitsPerSample;
 
                 if (formatTag == FORMAT_EXTENSIBLE)
                 {
                     if (chunkSize < 40) return { WavReaderError::malformed_file, {} };
-                    std::uint16_t cbSize = readU16LE(fmtData.data() + 16);
+                    std::uint16_t cbSize = readU16LE(fmtBuf + 16);
                     if (cbSize < 22) return { WavReaderError::malformed_file, {} };
 
-                    validBitsPerSample = readU16LE(fmtData.data() + 18);
-                    const std::uint8_t* guid = fmtData.data() + 24;
+                    validBitsPerSample = readU16LE(fmtBuf + 18);
+                    const std::uint8_t* guid = fmtBuf + 24;
 
                     if (std::memcmp(guid, GUID_PCM, 16) == 0)
                     {
@@ -162,22 +191,11 @@ namespace lsw::audio_diag::offline
                 if (hasData) return { WavReaderError::malformed_file, {} };
                 hasData = true;
 
-                dataChunkStart_ = file_.tellg();
+                dataChunkStart_ = chunkDataOffset;
                 dataChunkSize_ = chunkSize;
+            }
 
-                // skip data for now
-                file_.seekg(chunkSize + (chunkSize % 2), std::ios::cur);
-                if (file_.fail() && !file_.eof()) {
-                    // if it fails to seek past data and it's not EOF, it's an error unless this is the last chunk
-                    file_.clear();
-                }
-            }
-            else
-            {
-                // unknown chunk, skip it
-                file_.seekg(chunkSize + (chunkSize % 2), std::ios::cur);
-                if (file_.fail() && !file_.eof()) return { WavReaderError::malformed_file, {} };
-            }
+            chunkHeaderOffset = paddedChunkEnd;
         }
 
         if (!hasFmt || !hasData) return { WavReaderError::malformed_file, {} };
@@ -205,19 +223,30 @@ namespace lsw::audio_diag::offline
         if (validBitsPerSample == 0 || validBitsPerSample > bitsPerSample)
             return { WavReaderError::malformed_file, {} };
 
-        std::uint32_t expectedBlockAlign = channels * (bitsPerSample / 8);
+        if (isFloat_ && validBitsPerSample != bitsPerSample)
+            return { WavReaderError::unsupported_format, {} };
+
+        std::uint32_t expectedBlockAlign = static_cast<std::uint32_t>(channels) * static_cast<std::uint32_t>(bitsPerSample / 8);
         if (blockAlign != expectedBlockAlign || blockAlign == 0)
             return { WavReaderError::malformed_file, {} };
 
-        if (byteRate != sampleRate * blockAlign)
+        std::uint64_t expectedByteRate64 = 0;
+        if (!checkedMultiply(sampleRate, blockAlign, expectedByteRate64))
+            return { WavReaderError::malformed_file, {} };
+
+        if (static_cast<std::uint64_t>(byteRate) != expectedByteRate64)
             return { WavReaderError::malformed_file, {} };
 
         if (dataChunkSize_ % blockAlign != 0)
             return { WavReaderError::malformed_file, {} };
 
+        std::uint64_t frames64 = dataChunkSize_ / blockAlign;
+        if (frames64 > static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()))
+            return { WavReaderError::malformed_file, {} };
+
         blockAlign_ = blockAlign;
         metadata_.container = "RIFF/WAVE";
-        
+
         if (isFloat_) {
             metadata_.encoding = (bitsPerSample == 32) ? "float_f32" : "float_f64";
         } else {
@@ -231,12 +260,20 @@ namespace lsw::audio_diag::offline
         metadata_.channelCount = channels;
         metadata_.bitsPerSample = bitsPerSample;
         metadata_.validBitsPerSample = validBitsPerSample;
-        metadata_.frameCount = dataChunkSize_ / blockAlign;
+        metadata_.frameCount = static_cast<std::size_t>(frames64);
         metadata_.durationSeconds = static_cast<double>(metadata_.frameCount) / sampleRate;
 
         framesRead_ = 0;
         file_.clear();
-        file_.seekg(dataChunkStart_, std::ios::beg);
+
+        if (dataChunkStart_ > static_cast<std::uint64_t>(std::numeric_limits<std::streamoff>::max()))
+            return { WavReaderError::malformed_file, {} };
+
+        file_.seekg(static_cast<std::streamoff>(dataChunkStart_), std::ios::beg);
+        auto pos = file_.tellg();
+        if (pos < 0) return { WavReaderError::read_failed, {} };
+        std::uint64_t actualPos = static_cast<std::uint64_t>(pos);
+        if (actualPos != dataChunkStart_) return { WavReaderError::read_failed, {} };
 
         return { WavReaderError::success, metadata_ };
     }
@@ -250,9 +287,15 @@ namespace lsw::audio_diag::offline
         if (!checkedMultiply(framesToRead, blockAlign_, bytesToRead64))
             return { WavReadStatus::malformed_stream, 0 };
 
+        if (bytesToRead64 > static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()))
+            return { WavReadStatus::malformed_stream, 0 };
+
+        if (bytesToRead64 > static_cast<std::uint64_t>(std::numeric_limits<std::streamsize>::max()))
+            return { WavReadStatus::malformed_stream, 0 };
+
         std::size_t bytesToRead = static_cast<std::size_t>(bytesToRead64);
         buffer_.resize(bytesToRead);
-        if (!file_.read(reinterpret_cast<char*>(buffer_.data()), bytesToRead))
+        if (!file_.read(reinterpret_cast<char*>(buffer_.data()), static_cast<std::streamsize>(bytesToRead)))
             return { WavReadStatus::read_failed, 0 };
 
         channels.resize(metadata_.channelCount);
@@ -268,93 +311,90 @@ namespace lsw::audio_diag::offline
     void WavReader::decodeBlock(std::size_t frames, std::vector<std::vector<double>>& channels)
     {
         std::uint32_t chCount = metadata_.channelCount;
-        std::uint32_t bytesPerSample = metadata_.bitsPerSample / 8;
+        std::uint32_t bits = metadata_.bitsPerSample;
+        std::uint32_t validBits = metadata_.validBitsPerSample;
         const std::uint8_t* p = buffer_.data();
 
-        if (isFloat_)
+        for (std::size_t i = 0; i < frames; ++i)
         {
-            if (bytesPerSample == 4)
+            for (std::uint32_t ch = 0; ch < chCount; ++ch)
             {
-                for (std::size_t f = 0; f < frames; ++f)
+                double sample = 0.0;
+                if (isFloat_)
                 {
-                    for (std::size_t c = 0; c < chCount; ++c)
+                    if (bits == 32)
                     {
-                        std::uint32_t bits = readU32LE(p);
-                        float val;
-                        std::memcpy(&val, &bits, 4);
-                        channels[c][f] = val;
+                        float f32;
+                        std::memcpy(&f32, p, sizeof(float));
+                        sample = static_cast<double>(f32);
                         p += 4;
                     }
-                }
-            }
-            else // 8 bytes
-            {
-                for (std::size_t f = 0; f < frames; ++f)
-                {
-                    for (std::size_t c = 0; c < chCount; ++c)
+                    else if (bits == 64)
                     {
-                        std::uint32_t lo = readU32LE(p);
-                        std::uint32_t hi = readU32LE(p + 4);
-                        std::uint64_t bits = static_cast<std::uint64_t>(lo) | (static_cast<std::uint64_t>(hi) << 32);
-                        double val;
-                        std::memcpy(&val, &bits, 8);
-                        channels[c][f] = val;
+                        double f64;
+                        std::memcpy(&f64, p, sizeof(double));
+                        sample = f64;
                         p += 8;
                     }
                 }
-            }
-        }
-        else
-        {
-            if (bytesPerSample == 1)
-            {
-                for (std::size_t f = 0; f < frames; ++f)
+                else
                 {
-                    for (std::size_t c = 0; c < chCount; ++c)
+                    if (bits == 8)
                     {
-                        double val = (static_cast<double>(*p) - 128.0) / 128.0;
-                        channels[c][f] = val;
+                        std::uint8_t u8 = p[0];
+                        if (validBits < 8)
+                        {
+                            std::uint8_t shift = static_cast<std::uint8_t>(8U - validBits);
+                            u8 = static_cast<std::uint8_t>((u8 >> shift) << shift);
+                        }
+                        sample = (static_cast<double>(u8) - 128.0) / 128.0;
                         p += 1;
                     }
-                }
-            }
-            else if (bytesPerSample == 2)
-            {
-                for (std::size_t f = 0; f < frames; ++f)
-                {
-                    for (std::size_t c = 0; c < chCount; ++c)
+                    else if (bits == 16)
                     {
-                        std::int16_t val = static_cast<std::int16_t>(readU16LE(p));
-                        channels[c][f] = val / 32768.0;
+                        std::uint16_t u16 = readU16LE(p);
+                        std::int16_t s16 = static_cast<std::int16_t>(u16);
+                        if (validBits < 16)
+                        {
+                            std::uint16_t shift = static_cast<std::uint16_t>(16U - validBits);
+                            s16 = static_cast<std::int16_t>((s16 >> shift) << shift);
+                        }
+                        sample = static_cast<double>(s16) / 32768.0;
                         p += 2;
                     }
-                }
-            }
-            else if (bytesPerSample == 3)
-            {
-                for (std::size_t f = 0; f < frames; ++f)
-                {
-                    for (std::size_t c = 0; c < chCount; ++c)
+                    else if (bits == 24)
                     {
-                        std::uint32_t bits = p[0] | (p[1] << 8) | (p[2] << 16);
-                        if (bits & 0x800000) bits |= 0xFF000000;
-                        std::int32_t val = static_cast<std::int32_t>(bits);
-                        channels[c][f] = val / 8388608.0;
+                        std::uint32_t b0 = static_cast<std::uint32_t>(p[0]);
+                        std::uint32_t b1 = static_cast<std::uint32_t>(p[1]);
+                        std::uint32_t b2 = static_cast<std::uint32_t>(p[2]);
+                        std::uint32_t val32 = b0 | (b1 << 8) | (b2 << 16);
+                        if (val32 & 0x00800000U)
+                        {
+                            val32 |= 0xFF000000U;
+                        }
+                        std::int32_t s24 = static_cast<std::int32_t>(val32);
+                        if (validBits < 24)
+                        {
+                            std::uint32_t shift = 24U - validBits;
+                            s24 = (s24 >> shift) << shift;
+                        }
+                        sample = static_cast<double>(s24) / 8388608.0;
                         p += 3;
                     }
-                }
-            }
-            else // 4 bytes
-            {
-                for (std::size_t f = 0; f < frames; ++f)
-                {
-                    for (std::size_t c = 0; c < chCount; ++c)
+                    else if (bits == 32)
                     {
-                        std::int32_t val = static_cast<std::int32_t>(readU32LE(p));
-                        channels[c][f] = val / 2147483648.0;
+                        std::uint32_t u32 = readU32LE(p);
+                        std::int32_t s32 = static_cast<std::int32_t>(u32);
+                        if (validBits < 32)
+                        {
+                            std::uint32_t shift = 32U - validBits;
+                            s32 = (s32 >> shift) << shift;
+                        }
+                        sample = static_cast<double>(s32) / 2147483648.0;
                         p += 4;
                     }
                 }
+                channels[ch][i] = sample;
             }
         }
     }
