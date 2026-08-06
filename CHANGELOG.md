@@ -2,17 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
-## [0.3.0] - 2026-08-07
+## 0.3.0 - Unreleased
 
-### Added
-- WAV Analyzer CLI for offline analysis (`lsw_audio_diagnostics_cli`)
-- Streaming WAV Reader with `WavReadBlockResult`
-- Deterministic JSON Report generation
-- CLI E2E tests and CTest integration
-- Windows, Linux, and macOS CI support
-
-### Changed
-- Refactored project structure to include CLI and offline analysis components
+- Added Offline WAV Analyzer CLI (`lsw_audio_diagnostics_cli`) that outputs deterministic JSON reports.
+- Added streaming WAV reader supporting PCM (8/16/24/32-bit) and IEEE Float (32/64-bit) with `WAVE_FORMAT_EXTENSIBLE` support.
+- CLI execution and test coverage included in CMake CTest suite (`cli_end_to_end_tests`).
 
 ## 0.2.0 - 2026-08-06
 
