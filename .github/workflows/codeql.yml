@@ -9,6 +9,7 @@ on:
 
 jobs:
   analyze:
+    name: codeql-cpp
     runs-on: ubuntu-latest
     permissions:
       security-events: write

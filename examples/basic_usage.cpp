@@ -40,8 +40,13 @@ int main()
 
     const lsw::audio_diag::Snapshot snapshot = analyzer.getSnapshot();
     std::cout << "Peak: " << snapshot.channels[0].samplePeak << '\n'
+              << "Held Peak: " << snapshot.channels[0].heldPeak << '\n'
               << "RMS: " << snapshot.channels[0].smoothedRms << '\n'
               << "Correlation: " << snapshot.stereo.correlation << '\n'
-              << "Clip Count: " << snapshot.channels[0].clipCount << '\n';
+              << "Clip Count: " << snapshot.channels[0].clipCount << '\n'
+              << "Dropout Events: " << snapshot.channelEvents[0].dropout.eventCount << '\n'
+              << "Sustained Clip Events: " << snapshot.channelEvents[0].sustainedClip.eventCount << '\n'
+              << "DC Fault Events: " << snapshot.channelEvents[0].dcFault.eventCount << '\n'
+              << "Invalid Burst Events: " << snapshot.channelEvents[0].invalidBurst.eventCount << '\n';
     return 0;
 }

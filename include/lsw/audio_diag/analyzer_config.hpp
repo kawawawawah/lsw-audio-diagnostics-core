@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 namespace lsw::audio_diag
 {
@@ -44,5 +45,20 @@ namespace lsw::audio_diag
         double reversedPolarityThreshold = -0.950;
 
         double silenceHoldSeconds = 0.500;
+
+        double peakHoldSeconds = 2.0;
+        double peakHoldDecayDbPerSecond = 12.0;
+
+        double dropoutThresholdDbfs = -80.0;
+        double dropoutHoldSeconds = 0.100;
+        double dropoutRecoverySeconds = 0.050;
+
+        std::uint64_t sustainedClipMinimumSamples = 3U;
+
+        double dcFaultThreshold = 0.01;
+        double dcFaultHoldSeconds = 0.250;
+        double dcFaultRecoverySeconds = 0.250;
+
+        std::uint64_t invalidBurstThresholdPerBlock = 2U;
     };
 }

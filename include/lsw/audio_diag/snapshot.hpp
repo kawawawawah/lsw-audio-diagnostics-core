@@ -5,6 +5,7 @@
 
 #include "lsw/audio_diag/channel_metrics.hpp"
 #include "lsw/audio_diag/diagnostic_flags.hpp"
+#include "lsw/audio_diag/event_metrics.hpp"
 
 #include <array>
 #include <cstddef>
@@ -37,5 +38,7 @@ namespace lsw::audio_diag
         DiagnosticFlags diagnosticFlags = DiagnosticFlags::none;
         std::array<ChannelMetrics, 2U> channels {};
         StereoMetrics stereo {};
+        std::array<ChannelEvents, 2U> channelEvents {};
+        StereoEvents stereoEvents {};
     };
 }

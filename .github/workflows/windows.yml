@@ -7,6 +7,7 @@ on:
 
 jobs:
   build:
+    name: windows-msvc
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v5
@@ -15,6 +16,7 @@ jobs:
           cmake -S . -B build -G "Visual Studio 17 2022" -A x64
           -DLSW_AUDIO_DIAG_BUILD_TESTS=ON
           -DLSW_AUDIO_DIAG_BUILD_EXAMPLES=ON
+          -DLSW_AUDIO_DIAG_BUILD_WINDOWS_DASHBOARD=ON
           -DLSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS=ON
       - name: Release clean build
         run: cmake --build build --config Release --clean-first

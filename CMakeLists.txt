@@ -3,10 +3,11 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-project(LSWAudioDiagnosticsCore VERSION 0.1.0 LANGUAGES CXX)
+project(LSWAudioDiagnosticsCore VERSION 0.2.0 LANGUAGES CXX)
 
 option(LSW_AUDIO_DIAG_BUILD_TESTS "Build unit tests" ON)
 option(LSW_AUDIO_DIAG_BUILD_EXAMPLES "Build examples" ON)
+option(LSW_AUDIO_DIAG_BUILD_WINDOWS_DASHBOARD "Build the optional Windows dashboard example" OFF)
 option(LSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 
 include(GNUInstallDirs)
@@ -16,6 +17,7 @@ include(cmake/CompilerWarnings.cmake)
 add_library(lsw_audio_diagnostics STATIC
     src/analyzer.cpp
     src/correlation_tracker.cpp
+    src/event_tracker.cpp
     src/finite_value_guard.cpp
     src/level_tracker.cpp)
 add_library(LSW::AudioDiagnostics ALIAS lsw_audio_diagnostics)
@@ -40,6 +42,7 @@ if(LSW_AUDIO_DIAG_BUILD_TESTS)
         tests/analyzer_tests.cpp
         tests/correlation_tests.cpp
         tests/dc_offset_tests.cpp
+        tests/event_tests.cpp
         tests/finite_value_tests.cpp
         tests/level_tests.cpp)
     target_link_libraries(lsw_audio_diagnostics_tests PRIVATE LSW::AudioDiagnostics Threads::Threads)
@@ -55,6 +58,14 @@ if(LSW_AUDIO_DIAG_BUILD_EXAMPLES)
     target_compile_features(lsw_audio_diagnostics_example PRIVATE cxx_std_17)
     set_target_properties(lsw_audio_diagnostics_example PROPERTIES CXX_EXTENSIONS OFF)
     lsw_audio_diag_set_compiler_warnings(lsw_audio_diagnostics_example ${LSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS})
+endif()
+
+if(WIN32 AND LSW_AUDIO_DIAG_BUILD_WINDOWS_DASHBOARD)
+    add_executable(lsw_audio_diagnostics_dashboard WIN32 examples/windows_dashboard.cpp)
+    target_link_libraries(lsw_audio_diagnostics_dashboard PRIVATE LSW::AudioDiagnostics user32 gdi32)
+    target_compile_features(lsw_audio_diagnostics_dashboard PRIVATE cxx_std_17)
+    set_target_properties(lsw_audio_diagnostics_dashboard PROPERTIES CXX_EXTENSIONS OFF)
+    lsw_audio_diag_set_compiler_warnings(lsw_audio_diagnostics_dashboard ${LSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS})
 endif()
 
 install(TARGETS lsw_audio_diagnostics

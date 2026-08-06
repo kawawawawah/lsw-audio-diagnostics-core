@@ -38,6 +38,8 @@ namespace lsw::audio_diag::detail
 
     private:
         std::atomic<std::uint64_t> samplePeak_ { 0U };
+        std::atomic<std::uint64_t> heldPeak_ { 0U };
+        std::atomic<std::uint64_t> heldPeakDbfs_ { 0U };
         std::atomic<std::uint64_t> smoothedRms_ { 0U };
         std::atomic<std::uint64_t> rmsDbfs_ { 0U };
         std::atomic<std::uint64_t> dcOffset_ { 0U };
@@ -50,6 +52,48 @@ namespace lsw::audio_diag::detail
         std::atomic<std::uint64_t> negativeInfinityCount_ { 0U };
         std::atomic<std::uint64_t> denormalCount_ { 0U };
         std::atomic<std::uint32_t> isSilent_ { 0U };
+    };
+
+    class AtomicEventState
+    {
+    public:
+        void store(const EventState& value) noexcept;
+        [[nodiscard]] EventState load() const noexcept;
+
+    private:
+        std::atomic<std::uint32_t> state_ { 0U };
+        std::atomic<std::uint64_t> eventCount_ { 0U };
+        std::atomic<std::uint64_t> currentDurationSamples_ { 0U };
+        std::atomic<std::uint64_t> longestDurationSamples_ { 0U };
+        std::atomic<std::uint64_t> lastStartedAtSample_ { 0U };
+    };
+
+    class AtomicChannelEvents
+    {
+    public:
+        void store(const ChannelEvents& value) noexcept;
+        [[nodiscard]] ChannelEvents load() const noexcept;
+
+    private:
+        AtomicEventState dropout_ {};
+        AtomicEventState sustainedClip_ {};
+        AtomicEventState dcFault_ {};
+        AtomicEventState invalidBurst_ {};
+        std::atomic<std::uint64_t> maximumObservedDcOffset_ { 0U };
+        std::atomic<std::uint64_t> maximumInvalidSamplesPerBlock_ { 0U };
+    };
+
+    class AtomicStereoEvents
+    {
+    public:
+        void store(const StereoEvents& value) noexcept;
+        [[nodiscard]] StereoEvents load() const noexcept;
+
+    private:
+        AtomicEventState reversedPolarity_ {};
+        AtomicEventState identicalChannels_ {};
+        AtomicEventState leftOnly_ {};
+        AtomicEventState rightOnly_ {};
     };
 
     class AtomicStereoMetrics
@@ -84,5 +128,7 @@ namespace lsw::audio_diag::detail
         std::atomic<std::uint32_t> diagnosticFlags_ { 0U };
         AtomicChannelMetrics channels_[2] {};
         AtomicStereoMetrics stereo_ {};
+        AtomicChannelEvents channelEvents_[2] {};
+        AtomicStereoEvents stereoEvents_ {};
     };
 }

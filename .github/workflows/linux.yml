@@ -7,11 +7,17 @@ on:
 
 jobs:
   build:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         compiler: [g++, clang++]
+        include:
+          - compiler: g++
+            name: linux-gcc
+          - compiler: clang++
+            name: linux-clang
     steps:
       - uses: actions/checkout@v5
       - name: Configure

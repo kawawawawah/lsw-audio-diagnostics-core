@@ -7,6 +7,7 @@
 #include "lsw/audio_diag/audio_block_view.hpp"
 #include "lsw/audio_diag/detail/atomic_snapshot.hpp"
 #include "lsw/audio_diag/detail/correlation_tracker.hpp"
+#include "lsw/audio_diag/detail/event_tracker.hpp"
 #include "lsw/audio_diag/detail/level_tracker.hpp"
 #include "lsw/audio_diag/snapshot.hpp"
 
@@ -37,6 +38,10 @@ namespace lsw::audio_diag
         /** Validates and installs the configuration; no exception is ever thrown. */
         PrepareResult prepare(const AnalyzerConfig& config) noexcept;
         void reset() noexcept;
+        void resetLevels() noexcept;
+        void resetCounters() noexcept;
+        void clearDiagnosticFlags() noexcept;
+        void clearEvents() noexcept;
 
         /**
          * Processes a non-owning block without allocation, locks, I/O, logging, or exceptions.
@@ -59,7 +64,9 @@ namespace lsw::audio_diag
 
         AnalyzerConfig config_ {};
         detail::LevelTracker levelTrackers_[2] {};
+        detail::ChannelEventTracker eventTrackers_[2] {};
         detail::CorrelationTracker correlationTracker_ {};
+        detail::StereoEventTracker stereoEventTracker_ {};
         detail::AtomicSnapshot atomicSnapshot_ {};
         bool prepared_ = false;
         std::uint64_t processedSampleCount_ = 0U;

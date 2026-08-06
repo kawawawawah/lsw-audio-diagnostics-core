@@ -17,6 +17,8 @@ namespace lsw::audio_diag::detail
     public:
         void configure(const AnalyzerConfig& config) noexcept;
         void reset() noexcept;
+        void resetLevels() noexcept;
+        void resetCounters() noexcept;
         void beginBlock() noexcept;
         void processSample(double sample, SampleClassification classification) noexcept;
         void endBlock(std::size_t numberOfSamples) noexcept;
@@ -27,10 +29,15 @@ namespace lsw::audio_diag::detail
         double dcAlpha_ = 0.0;
         double silenceThresholdDbfs_ = -90.0;
         double clipThreshold_ = 1.0;
+        double sampleRate_ = 48000.0;
         std::uint64_t silenceHoldSamples_ = 0U;
+        std::uint64_t peakHoldSamples_ = 0U;
+        double peakHoldDecayDbPerSecond_ = 12.0;
         double smoothedMeanSquare_ = 0.0;
         double smoothedDc_ = 0.0;
         double blockPeak_ = 0.0;
+        double heldPeak_ = 0.0;
+        std::uint64_t heldPeakRemainingSamples_ = 0U;
         double maximumAbsoluteSample_ = 0.0;
         std::uint64_t clipCount_ = 0U;
         std::uint64_t consecutiveClipCount_ = 0U;
