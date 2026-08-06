@@ -172,10 +172,21 @@ namespace lsw::audio_diag::detail
             {
                 const std::uint64_t decaySamples = blockSamples - heldPeakRemainingSamples_;
                 heldPeakRemainingSamples_ = 0U;
-                const double decayDb = peakHoldDecayDbPerSecond_
-                                       * (static_cast<double>(decaySamples) / sampleRate_);
-                const double decayedDbfs = std::max(minimumDbfs, dbfsFromPeak(heldPeak_) - decayDb);
-                heldPeak_ = decayedDbfs <= minimumDbfs ? 0.0 : std::pow(10.0, decayedDbfs / 20.0);
+                if (decaySamples != 0U)
+                {
+                    const double decayDb = peakHoldDecayDbPerSecond_
+                                           * (static_cast<double>(decaySamples) / sampleRate_);
+                    const double decayFactor = std::pow(10.0, -decayDb / 20.0);
+                    const double decayedPeak = heldPeak_ * decayFactor;
+                    heldPeak_ = std::isfinite(decayedPeak) && decayedPeak > 1.0e-8
+                                    ? decayedPeak
+                                    : 0.0;
+                }
+                if (heldPeak_ <= blockPeak_)
+                {
+                    heldPeak_ = blockPeak_;
+                    heldPeakRemainingSamples_ = peakHoldSamples_;
+                }
             }
         }
     }

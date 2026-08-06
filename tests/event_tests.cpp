@@ -116,6 +116,57 @@ LSW_TEST_CASE(zero_peak_hold_starts_decay_without_delay)
     LSW_CHECK(analyzer.getSnapshot().channels[0].heldPeak < 1.0);
 }
 
+LSW_TEST_CASE(zero_peak_hold_decay_never_drops_below_the_current_block_peak)
+{
+    auto config = eventConfig();
+    config.peakHoldSeconds = 0.0;
+    config.peakHoldDecayDbPerSecond = 20000.0;
+    auto analyzer = prepared<float>(config);
+    processMono(analyzer, { 1.0F });
+    processMono(analyzer, { 0.9F });
+    const auto metrics = analyzer.getSnapshot().channels[0];
+    LSW_CHECK(metrics.heldPeak >= metrics.samplePeak);
+    LSW_CHECK_NEAR(metrics.samplePeak, 0.9, 1.0e-6);
+    LSW_CHECK_NEAR(metrics.heldPeak, 0.9, 1.0e-6);
+    LSW_CHECK_NEAR(metrics.heldPeakDbfs, -0.9151, 0.01);
+}
+
+LSW_TEST_CASE(current_block_peak_restarts_peak_hold_after_decay_clamp)
+{
+    auto config = eventConfig(1U, 2U);
+    config.peakHoldSeconds = 0.001;
+    config.peakHoldDecayDbPerSecond = 20000.0;
+    auto analyzer = prepared<float>(config);
+    processMono(analyzer, { 1.0F });
+    processMono(analyzer, { 0.9F, 0.9F });
+    LSW_CHECK_NEAR(analyzer.getSnapshot().channels[0].heldPeak, 0.9, 1.0e-6);
+    processMono(analyzer, { 0.0F });
+    const auto metrics = analyzer.getSnapshot().channels[0];
+    LSW_CHECK_NEAR(metrics.heldPeak, 0.9, 1.0e-6);
+    LSW_CHECK(metrics.heldPeak >= metrics.samplePeak);
+}
+
+LSW_TEST_CASE(extreme_peak_hold_boundary_skips_reconstruction_and_remains_finite)
+{
+    auto config = eventConfig(1U, 2U);
+    config.peakHoldSeconds = 0.002;
+    auto analyzer = prepared<double>(config);
+    const double maximum = std::numeric_limits<double>::max();
+    processMono(analyzer, { maximum });
+    processMono(analyzer, { 0.0, 0.0 });
+    const auto atBoundary = analyzer.getSnapshot().channels[0];
+    LSW_CHECK_EQ(atBoundary.heldPeak, maximum);
+    LSW_CHECK(std::isfinite(atBoundary.heldPeak));
+    LSW_CHECK(std::isfinite(atBoundary.heldPeakDbfs));
+    LSW_CHECK(std::isfinite(atBoundary.smoothedRms));
+    LSW_CHECK(std::isfinite(atBoundary.rmsDbfs));
+    processMono(analyzer, { 0.0 });
+    const auto afterDecay = analyzer.getSnapshot().channels[0];
+    LSW_CHECK(std::isfinite(afterDecay.heldPeak));
+    LSW_CHECK(std::isfinite(afterDecay.heldPeakDbfs));
+    LSW_CHECK(afterDecay.heldPeak >= afterDecay.samplePeak);
+}
+
 LSW_TEST_CASE(peak_hold_values_stay_finite)
 {
     auto analyzer = prepared<float>(eventConfig());
