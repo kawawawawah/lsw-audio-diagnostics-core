@@ -478,6 +478,84 @@ LSW_TEST_CASE(stereo_null_input_does_not_generate_an_event)
     LSW_CHECK_EQ(analyzer.getSnapshot().stereoEvents.reversedPolarity.eventCount, 0U);
 }
 
+LSW_TEST_CASE(partial_null_stereo_preserves_available_channel_metrics)
+{
+    auto analyzer = prepared<float>(eventConfig(2U));
+    const auto left = activeBlock();
+    const float* channels[] { left.data(), nullptr };
+    analyzer.process(channels, 2U, left.size());
+    const auto snapshot = analyzer.getSnapshot();
+    LSW_CHECK_NEAR(snapshot.channels[0].samplePeak, 0.5, 1.0e-6);
+    LSW_CHECK(snapshot.channels[0].smoothedRms > 0.0);
+    LSW_CHECK_EQ(snapshot.processedSampleCount, 10U);
+    LSW_CHECK_EQ(snapshot.processedBlockCount, 1U);
+    LSW_CHECK(lsw::audio_diag::hasFlag(snapshot.diagnosticFlags,
+                                       lsw::audio_diag::DiagnosticFlags::nullInput));
+}
+
+LSW_TEST_CASE(partial_null_stereo_suppresses_channel_and_stereo_event_transitions)
+{
+    auto analyzer = prepared<float>(eventConfig(2U));
+    const auto clipped = lsw::audio_diag::test::constant<float>(10U, 1.1);
+    const float* channels[] { clipped.data(), nullptr };
+    analyzer.process(channels, 2U, clipped.size());
+    const auto snapshot = analyzer.getSnapshot();
+    LSW_CHECK_EQ(snapshot.channelEvents[0].dropout.eventCount, 0U);
+    LSW_CHECK_EQ(snapshot.channelEvents[0].sustainedClip.eventCount, 0U);
+    LSW_CHECK_EQ(snapshot.stereoEvents.leftOnly.eventCount, 0U);
+    LSW_CHECK_EQ(snapshot.stereoEvents.rightOnly.eventCount, 0U);
+}
+
+LSW_TEST_CASE(partial_null_stereo_freezes_active_event_duration_and_state)
+{
+    auto analyzer = prepared<float>(eventConfig(2U));
+    const auto left = lsw::audio_diag::test::constant<float>(10U, 1.1);
+    const auto right = lsw::audio_diag::test::constant<float>(10U, -1.1);
+    processStereo(analyzer, left, right);
+    const auto before = analyzer.getSnapshot();
+    const float* partialChannels[] { left.data(), nullptr };
+    analyzer.process(partialChannels, 2U, left.size());
+    const auto after = analyzer.getSnapshot();
+    LSW_CHECK(after.channelEvents[0].sustainedClip.active);
+    LSW_CHECK_EQ(after.channelEvents[0].sustainedClip.eventCount,
+                 before.channelEvents[0].sustainedClip.eventCount);
+    LSW_CHECK_EQ(after.channelEvents[0].sustainedClip.currentDurationSamples,
+                 before.channelEvents[0].sustainedClip.currentDurationSamples);
+    LSW_CHECK(after.stereoEvents.reversedPolarity.active);
+    LSW_CHECK_EQ(after.stereoEvents.reversedPolarity.eventCount,
+                 before.stereoEvents.reversedPolarity.eventCount);
+    LSW_CHECK_EQ(after.stereoEvents.reversedPolarity.currentDurationSamples,
+                 before.stereoEvents.reversedPolarity.currentDurationSamples);
+}
+
+LSW_TEST_CASE(dropout_arm_requires_contiguous_active_signal)
+{
+    auto config = eventConfig();
+    config.dropoutRecoverySeconds = 0.020;
+    auto analyzer = prepared<float>(config);
+    for (int iteration = 0; iteration < 3; ++iteration)
+    {
+        processMono(analyzer, activeBlock());
+        processMono(analyzer, silentBlock());
+    }
+    LSW_CHECK_EQ(analyzer.getSnapshot().channelEvents[0].dropout.eventCount, 0U);
+}
+
+LSW_TEST_CASE(dropout_arm_starts_only_after_contiguous_active_recovery_interval)
+{
+    auto config = eventConfig();
+    config.dropoutRecoverySeconds = 0.020;
+    auto analyzer = prepared<float>(config);
+    processMono(analyzer, activeBlock());
+    processMono(analyzer, silentBlock());
+    processMono(analyzer, activeBlock());
+    processMono(analyzer, activeBlock());
+    processMono(analyzer, silentBlock());
+    const auto dropout = analyzer.getSnapshot().channelEvents[0].dropout;
+    LSW_CHECK(dropout.active);
+    LSW_CHECK_EQ(dropout.eventCount, 1U);
+}
+
 LSW_TEST_CASE(reset_clears_events_counters_and_processed_time)
 {
     auto analyzer = prepared<float>(eventConfig());

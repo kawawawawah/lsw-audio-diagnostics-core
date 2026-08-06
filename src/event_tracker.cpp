@@ -190,12 +190,19 @@ namespace lsw::audio_diag::detail
 
         const bool activeSignal = metrics.rmsDbfs >= activeSignalThresholdDbfs_;
         const bool dropoutLow = metrics.rmsDbfs < dropoutThresholdDbfs_;
-        if (activeSignal)
+        if (!dropoutArmed_)
         {
-            dropoutArmedSamples_ = addSaturated(dropoutArmedSamples_, blockSamples);
-            if (dropoutArmedSamples_ >= dropoutRecoverySamples_)
+            if (activeSignal)
             {
-                dropoutArmed_ = true;
+                dropoutArmedSamples_ = addSaturated(dropoutArmedSamples_, blockSamples);
+                if (dropoutArmedSamples_ >= dropoutRecoverySamples_)
+                {
+                    dropoutArmed_ = true;
+                }
+            }
+            else
+            {
+                dropoutArmedSamples_ = 0U;
             }
         }
 

@@ -493,31 +493,37 @@ namespace lsw::audio_diag
             return;
         }
 
-        bool validInput = numberOfSamples != 0U;
+        bool hasMissingChannel = false;
         for (std::size_t channel = 0U; channel < config_.numberOfChannels; ++channel)
         {
             if (channel >= numberOfChannels || channels[channel] == nullptr)
             {
                 stickyFlags_ |= static_cast<std::uint32_t>(DiagnosticFlags::nullInput);
-                validInput = false;
+                hasMissingChannel = true;
             }
         }
-        if (!validInput)
+        if (numberOfSamples == 0U)
         {
-            if (numberOfSamples == 0U)
-            {
-                processedBlockCount_ = addSaturated(processedBlockCount_, 1U);
-            }
+            processedBlockCount_ = addSaturated(processedBlockCount_, 1U);
             publishSnapshot();
             return;
         }
 
+        const bool validForEvents = !hasMissingChannel
+                                    && numberOfChannels == config_.numberOfChannels;
+
         const SampleType* inputs[maximumSupportedChannels] { nullptr, nullptr };
         for (std::size_t channel = 0U; channel < config_.numberOfChannels; ++channel)
         {
-            inputs[channel] = channels[channel];
+            if (channel < numberOfChannels)
+            {
+                inputs[channel] = channels[channel];
+            }
             levelTrackers_[channel].beginBlock();
-            eventTrackers_[channel].beginBlock();
+            if (validForEvents)
+            {
+                eventTrackers_[channel].beginBlock();
+            }
         }
         if (config_.numberOfChannels == maximumSupportedChannels)
         {
@@ -542,9 +548,12 @@ namespace lsw::audio_diag
                     classifications[channel] = sanitized.classification;
                 }
                 levelTrackers_[channel].processSample(samples[channel], classifications[channel]);
-                eventTrackers_[channel].processSample(
-                    std::abs(samples[channel]) >= config_.clipThreshold, classifications[channel],
-                    addSaturated(blockStartSample, sampleIndex));
+                if (validForEvents)
+                {
+                    eventTrackers_[channel].processSample(
+                        std::abs(samples[channel]) >= config_.clipThreshold, classifications[channel],
+                        addSaturated(blockStartSample, sampleIndex));
+                }
             }
             if (config_.numberOfChannels == maximumSupportedChannels)
             {
@@ -555,17 +564,23 @@ namespace lsw::audio_diag
         for (std::size_t channel = 0U; channel < config_.numberOfChannels; ++channel)
         {
             levelTrackers_[channel].endBlock(numberOfSamples);
-            eventTrackers_[channel].endBlock(levelTrackers_[channel].metrics(), numberOfSamples,
-                                             blockStartSample);
+            if (validForEvents)
+            {
+                eventTrackers_[channel].endBlock(levelTrackers_[channel].metrics(), numberOfSamples,
+                                                 blockStartSample);
+            }
         }
         if (config_.numberOfChannels == maximumSupportedChannels)
         {
             const StereoMetrics stereo = makeStereoMetrics(config_, levelTrackers_[0].metrics(),
                                                             levelTrackers_[1].metrics(),
                                                             correlationTracker_);
-            stereoEventTracker_.update(stereo.reversedPolarity, stereo.identicalChannels,
-                                       stereo.leftOnly, stereo.rightOnly, numberOfSamples,
-                                       blockStartSample);
+            if (validForEvents)
+            {
+                stereoEventTracker_.update(stereo.reversedPolarity, stereo.identicalChannels,
+                                           stereo.leftOnly, stereo.rightOnly, numberOfSamples,
+                                           blockStartSample);
+            }
         }
         processedSampleCount_ = addSaturated(processedSampleCount_, numberOfSamples);
         processedBlockCount_ = addSaturated(processedBlockCount_, 1U);

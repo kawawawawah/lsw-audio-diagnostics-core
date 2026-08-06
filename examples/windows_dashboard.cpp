@@ -414,16 +414,21 @@ namespace
         EndPaint(window, &paint);
     }
 
-    [[nodiscard]] Scenario scenarioFromPoint(const LPARAM point) noexcept
+    [[nodiscard]] bool tryScenarioFromPoint(const LPARAM point, Scenario& scenario) noexcept
     {
         const int x = static_cast<int>(static_cast<short>(LOWORD(point)));
         const int y = static_cast<int>(static_cast<short>(HIWORD(point)));
-        if (y >= 91 && y <= 108 && x >= 34 && x <= 850)
+        for (int index = 1; index <= 7; ++index)
         {
-            const int index = ((x - 34) / 118) + 1;
-            return static_cast<Scenario>(std::max(1, std::min(7, index)));
+            const int left = 34 + ((index - 1) * 118);
+            const RECT button { left, 91, left + 108, 108 };
+            if (x >= button.left && x < button.right && y >= button.top && y < button.bottom)
+            {
+                scenario = static_cast<Scenario>(index);
+                return true;
+            }
         }
-        return Scenario::faultShowcase;
+        return false;
     }
 
     LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wordParameter,
@@ -486,8 +491,14 @@ namespace
                 }
                 return 0;
             case WM_LBUTTONDOWN:
-                state->selectScenario(scenarioFromPoint(longParameter));
+            {
+                Scenario selected = Scenario::faultShowcase;
+                if (tryScenarioFromPoint(longParameter, selected))
+                {
+                    state->selectScenario(selected);
+                }
                 return 0;
+            }
             case WM_DESTROY:
                 KillTimer(window, timerIdentifier);
                 PostQuitMessage(0);

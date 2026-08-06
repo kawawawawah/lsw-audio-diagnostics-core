@@ -32,7 +32,11 @@ namespace lsw::audio_diag::detail
             const double maximum = std::numeric_limits<double>::max();
             const double absoluteLeft = std::abs(left);
             const double absoluteRight = std::abs(right);
-            return absoluteLeft > maximum - absoluteRight ? maximum : std::abs(left - right);
+            if (std::signbit(left) == std::signbit(right))
+            {
+                return std::abs(left - right);
+            }
+            return absoluteLeft > maximum - absoluteRight ? maximum : absoluteLeft + absoluteRight;
         }
     }
 

@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: MIT
 
 #include "lsw/audio_diag/analyzer.hpp"
+#include "lsw/audio_diag/detail/correlation_tracker.hpp"
 #include "synthetic_signal.hpp"
 #include "test_framework.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <vector>
 
 namespace
@@ -159,4 +161,53 @@ LSW_TEST_CASE(silent_stereo_has_neutral_finite_correlation_without_reverse_polar
     LSW_CHECK(snapshot.stereo.monoCompatibilityScore >= 0.0);
     LSW_CHECK(snapshot.stereo.monoCompatibilityScore <= 1.0);
     LSW_CHECK(!snapshot.stereo.reversedPolarity);
+}
+
+LSW_TEST_CASE(finite_difference_of_equal_positive_double_max_is_zero)
+{
+    lsw::audio_diag::detail::CorrelationTracker tracker;
+    tracker.configure(stereoConfig(1U));
+    tracker.beginBlock();
+    const double maximum = std::numeric_limits<double>::max();
+    tracker.processPair(maximum, maximum);
+    LSW_CHECK_NEAR(tracker.maximumAbsoluteDifference(), 0.0, 0.0);
+}
+
+LSW_TEST_CASE(finite_difference_of_equal_negative_double_max_is_zero)
+{
+    lsw::audio_diag::detail::CorrelationTracker tracker;
+    tracker.configure(stereoConfig(1U));
+    tracker.beginBlock();
+    const double maximum = std::numeric_limits<double>::max();
+    tracker.processPair(-maximum, -maximum);
+    LSW_CHECK_NEAR(tracker.maximumAbsoluteDifference(), 0.0, 0.0);
+}
+
+LSW_TEST_CASE(finite_difference_of_opposite_double_max_saturates_finitely)
+{
+    lsw::audio_diag::detail::CorrelationTracker tracker;
+    tracker.configure(stereoConfig(1U));
+    tracker.beginBlock();
+    const double maximum = std::numeric_limits<double>::max();
+    tracker.processPair(maximum, -maximum);
+    LSW_CHECK(std::isfinite(tracker.maximumAbsoluteDifference()));
+    LSW_CHECK_EQ(tracker.maximumAbsoluteDifference(), maximum);
+}
+
+LSW_TEST_CASE(identical_extreme_double_channels_have_zero_difference_and_finite_snapshot)
+{
+    auto config = stereoConfig(1U);
+    lsw::audio_diag::Analyzer<double> analyzer;
+    LSW_CHECK_EQ(analyzer.prepare(config), lsw::audio_diag::PrepareResult::success);
+    const double maximum = std::numeric_limits<double>::max();
+    const double left[] { maximum };
+    const double right[] { maximum };
+    const double* channels[] { left, right };
+    analyzer.process(channels, 2U, 1U);
+    const auto snapshot = analyzer.getSnapshot();
+    LSW_CHECK(snapshot.stereo.identicalChannels);
+    LSW_CHECK(std::isfinite(snapshot.channels[0].smoothedRms));
+    LSW_CHECK(std::isfinite(snapshot.channels[0].rmsDbfs));
+    LSW_CHECK(std::isfinite(snapshot.stereo.correlation));
+    LSW_CHECK(std::isfinite(snapshot.stereo.channelBalanceDb));
 }
