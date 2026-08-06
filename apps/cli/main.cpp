@@ -154,8 +154,10 @@ int main(int argc, char** argv)
         {
             fs::path outPath(outputPath);
             fs::path tempPath = outPath.parent_path() / (outPath.filename().string() + ".tmp");
+            fs::path backupPath = outPath.parent_path() / (outPath.filename().string() + ".bak");
             if (outPath.parent_path().empty()) {
                 tempPath = outPath.string() + ".tmp";
+                backupPath = outPath.string() + ".bak";
             }
 
             std::ofstream out(tempPath, std::ios::binary);
@@ -166,6 +168,7 @@ int main(int argc, char** argv)
             }
 
             out.write(json.data(), json.size());
+            out.flush();
             if (!out)
             {
                 std::cerr << "Error: Failed to write output file\n";
@@ -175,12 +178,35 @@ int main(int argc, char** argv)
             }
             out.close();
 
+            bool backupCreated = false;
+            if (fs::exists(outPath, ec))
+            {
+                fs::remove(backupPath, ec);
+                fs::rename(outPath, backupPath, ec);
+                if (ec)
+                {
+                    std::cerr << "Error: Failed to create backup of existing output file\n";
+                    fs::remove(tempPath, ec);
+                    return 6;
+                }
+                backupCreated = true;
+            }
+
             fs::rename(tempPath, outPath, ec);
             if (ec)
             {
-                std::cerr << "Error: Failed to finalize output file\n";
-                fs::remove(tempPath, ec); // cleanup best effort
+                std::cerr << "Error: Failed to replace output file\n";
+                if (backupCreated)
+                {
+                    fs::rename(backupPath, outPath, ec);
+                }
+                fs::remove(tempPath, ec);
                 return 6;
+            }
+
+            if (backupCreated)
+            {
+                fs::remove(backupPath, ec);
             }
         }
         else

@@ -10,6 +10,10 @@ option(LSW_AUDIO_DIAG_BUILD_EXAMPLES "Build examples" ON)
 option(LSW_AUDIO_DIAG_BUILD_CLI "Build the WAV analyzer command-line tool" ON)
 option(LSW_AUDIO_DIAG_BUILD_WINDOWS_DASHBOARD "Build the optional Windows dashboard example" OFF)
 option(LSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
+option(LSW_AUDIO_DIAG_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
+if(DEFINED LSW_AUDIO_DIAG_WARNINGS_AS_ERRORS)
+    set(LSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS ${LSW_AUDIO_DIAG_WARNINGS_AS_ERRORS})
+endif()
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -72,6 +76,7 @@ if(LSW_AUDIO_DIAG_BUILD_CLI)
         add_executable(lsw_audio_diagnostics_cli_tests
             tests/test_main.cpp
             tests/cli_argument_tests.cpp
+            apps/cli/cli_arguments.cpp
             tests/wav_reader_tests.cpp
             tests/json_report_tests.cpp
             tests/wav_fixture_builder.cpp)
