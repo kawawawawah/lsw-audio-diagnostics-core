@@ -26,6 +26,20 @@ namespace lsw::audio_diag::offline
         AudioMetadata metadata;
     };
 
+    enum class WavReadStatus
+    {
+        success,
+        end_of_stream,
+        read_failed,
+        malformed_stream
+    };
+
+    struct WavReadBlockResult
+    {
+        WavReadStatus status;
+        std::size_t frameCount;
+    };
+
     class WavReader
     {
     public:
@@ -37,8 +51,7 @@ namespace lsw::audio_diag::offline
 
         WavReaderResult open(const std::string& path);
         
-        // Returns number of frames read (0 if EOF or error).
-        std::size_t readBlock(std::vector<std::vector<double>>& deinterleavedChannels, std::size_t maxFrames);
+        WavReadBlockResult readBlock(std::vector<std::vector<double>>& deinterleavedChannels, std::size_t maxFrames);
 
         const AudioMetadata& getMetadata() const { return metadata_; }
 

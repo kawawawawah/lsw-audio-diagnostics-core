@@ -1,0 +1,4 @@
+E:/LSW Audio Diagnostics Core/build-core-only/CMakeFiles/lsw_audio_diagnostics.dir
+E:/LSW Audio Diagnostics Core/build-core-only/CMakeFiles/INSTALL.dir
+E:/LSW Audio Diagnostics Core/build-core-only/CMakeFiles/ALL_BUILD.dir
+E:/LSW Audio Diagnostics Core/build-core-only/CMakeFiles/ZERO_CHECK.dir

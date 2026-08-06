@@ -70,6 +70,12 @@ namespace lsw::audio_diag::offline
                 writeString(v);
             }
 
+            void value(const char* v)
+            {
+                comma();
+                writeString(std::string(v));
+            }
+
             void value(double v)
             {
                 comma();
