@@ -3,10 +3,12 @@
 
 #include "lsw/audio_diag/analyzer.hpp"
 #include "lsw/audio_diag/diagnostic_flags.hpp"
+#include "lsw/audio_diag/version.hpp"
 #include "synthetic_signal.hpp"
 #include "test_framework.hpp"
 
 #include <cstddef>
+#include <cstring>
 
 namespace
 {
@@ -149,4 +151,24 @@ LSW_TEST_CASE(processed_sample_and_block_counts_accumulate)
     const auto snapshot = analyzer.getSnapshot();
     LSW_CHECK_EQ(snapshot.processedSampleCount, 32U);
     LSW_CHECK_EQ(snapshot.processedBlockCount, 2U);
+}
+
+namespace
+{
+    [[nodiscard]] bool sameInt(const int actual, const int expected) noexcept
+    {
+        return actual == expected;
+    }
+}
+
+LSW_TEST_CASE(version_constants_and_string_match_v0_2_0)
+{
+    LSW_CHECK(sameInt(LSW_AUDIO_DIAG_VERSION_MAJOR, 0));
+    LSW_CHECK(sameInt(LSW_AUDIO_DIAG_VERSION_MINOR, 2));
+    LSW_CHECK(sameInt(LSW_AUDIO_DIAG_VERSION_PATCH, 0));
+    LSW_CHECK(sameInt(lsw::audio_diag::versionMajor, 0));
+    LSW_CHECK(sameInt(lsw::audio_diag::versionMinor, 2));
+    LSW_CHECK(sameInt(lsw::audio_diag::versionPatch, 0));
+    LSW_CHECK_EQ(std::strcmp(LSW_AUDIO_DIAG_VERSION_STRING, "0.2.0"), 0);
+    LSW_CHECK_EQ(std::strcmp(lsw::audio_diag::versionString, "0.2.0"), 0);
 }
