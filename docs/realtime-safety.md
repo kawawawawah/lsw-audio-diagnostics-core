@@ -6,7 +6,7 @@
 
 ## `process()`
 
-After a successful `prepare()`, `process()` performs bounded loops over caller-owned samples, updates fixed-size state for at most two channels, and stores atomic snapshot fields. It performs no heap allocation, deallocation, locking, file I/O, logging, exception propagation, operating-system calls, or blocking work.
+After a successful `prepare()`, `process()` performs bounded loops over caller-owned samples, updates fixed-size level, correlation, and event state for at most two channels, and stores atomic snapshot fields. It performs no heap allocation, deallocation, locking, file I/O, logging, exception propagation, operating-system calls, or blocking work.
 
 ## Snapshot readers
 

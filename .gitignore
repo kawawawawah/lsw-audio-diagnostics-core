@@ -4,6 +4,8 @@
 build/
 install/
 build-consumer-test/
+build-consumer-v010-compat/
+build-consumer-v020/
 out/
 .vs/
 *.user
