@@ -13,7 +13,7 @@ jobs:
       matrix:
         compiler: [g++, clang++]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Configure
         env:
           CXX: ${{ matrix.compiler }}
