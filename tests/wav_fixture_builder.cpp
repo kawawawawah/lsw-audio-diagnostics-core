@@ -25,6 +25,7 @@ namespace lsw::audio_diag::test
     WavFixtureBuilder& WavFixtureBuilder::setBitsPerSample(std::uint16_t bitsPerSample)
     {
         bitsPerSample_ = bitsPerSample;
+        validBitsPerSample_ = bitsPerSample;
         return *this;
     }
 
@@ -44,6 +45,13 @@ namespace lsw::audio_diag::test
     {
         isExtensible_ = isExtensible;
         if (isExtensible_) formatTag_ = 0xFFFE;
+        return *this;
+    }
+
+    WavFixtureBuilder& WavFixtureBuilder::setCustomGuid(const std::uint8_t guid[16])
+    {
+        hasCustomGuid_ = true;
+        std::memcpy(customGuid_, guid, 16);
         return *this;
     }
 
@@ -70,6 +78,15 @@ namespace lsw::audio_diag::test
         dataBytes_.push_back(static_cast<std::uint8_t>((u >> 8) & 0xFF));
         dataBytes_.push_back(static_cast<std::uint8_t>((u >> 16) & 0xFF));
         dataBytes_.push_back(static_cast<std::uint8_t>((u >> 24) & 0xFF));
+        return *this;
+    }
+
+    WavFixtureBuilder& WavFixtureBuilder::addSample24(std::int32_t value)
+    {
+        std::uint32_t u = static_cast<std::uint32_t>(value);
+        dataBytes_.push_back(static_cast<std::uint8_t>(u & 0xFF));
+        dataBytes_.push_back(static_cast<std::uint8_t>((u >> 8) & 0xFF));
+        dataBytes_.push_back(static_cast<std::uint8_t>((u >> 16) & 0xFF));
         return *this;
     }
 
@@ -161,6 +178,61 @@ namespace lsw::audio_diag::test
         buf.push_back(static_cast<std::uint8_t>((val >> 8) & 0xFF));
     }
 
+    void WavFixtureBuilder::writeFmtChunk(std::vector<std::uint8_t>& out) const
+    {
+        out.insert(out.end(), {'f', 'm', 't', ' '});
+
+        if (breakChunkHeader_) {
+            out.push_back(0);
+            out.push_back(0);
+            return;
+        }
+
+        std::uint32_t fmtSize = isExtensible_ ? 40 : 16;
+        writeU32LE(out, fmtSize);
+
+        writeU16LE(out, formatTag_);
+        writeU16LE(out, channels_);
+        writeU32LE(out, sampleRate_);
+
+        std::uint32_t byteRate = (overrideByteRate_ != 0xFFFFFFFF) ? overrideByteRate_ : sampleRate_ * channels_ * (bitsPerSample_ / 8);
+        writeU32LE(out, byteRate);
+
+        std::uint16_t blockAlign = (overrideBlockAlign_ != 0xFFFFFFFF) ? static_cast<std::uint16_t>(overrideBlockAlign_) : static_cast<std::uint16_t>(channels_ * (bitsPerSample_ / 8));
+        writeU16LE(out, blockAlign);
+        writeU16LE(out, bitsPerSample_);
+
+        if (isExtensible_)
+        {
+            writeU16LE(out, 22); // cbSize
+            writeU16LE(out, validBitsPerSample_);
+            writeU32LE(out, 0); // channel mask
+
+            std::uint8_t guid[16] = {
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,
+                0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71
+            };
+            if (hasCustomGuid_) {
+                std::memcpy(guid, customGuid_, 16);
+            } else if (isFloat_) {
+                guid[0] = 0x03;
+            }
+            out.insert(out.end(), guid, guid + 16);
+        }
+    }
+
+    void WavFixtureBuilder::writeDataChunk(std::vector<std::uint8_t>& out) const
+    {
+        out.insert(out.end(), {'d', 'a', 't', 'a'});
+        writeU32LE(out, static_cast<std::uint32_t>(dataBytes_.size()));
+        out.insert(out.end(), dataBytes_.begin(), dataBytes_.end());
+
+        if (dataBytes_.size() % 2 != 0 || oddPadding_)
+        {
+            out.push_back(0); // odd padding
+        }
+    }
+
     std::vector<std::uint8_t> WavFixtureBuilder::build() const
     {
         std::vector<std::uint8_t> out;
@@ -171,9 +243,9 @@ namespace lsw::audio_diag::test
             return out;
         }
 
-        out.insert(out.end(), {'R', 'I', 'F', 'F'});
+        for (char c : riffHeader_) out.push_back(c);
         writeU32LE(out, 0); // Placeholder for size
-        out.insert(out.end(), {'W', 'A', 'V', 'E'});
+        for (char c : waveHeader_) out.push_back(c);
 
         for (const auto& ch : extraChunks_)
         {
@@ -183,56 +255,19 @@ namespace lsw::audio_diag::test
             if (ch.data.size() % 2 != 0) out.push_back(0); // padding
         }
 
-        if (!omitFmt_)
+        if (fmtAfterData_)
         {
-            out.insert(out.end(), {'f', 'm', 't', ' '});
-            
-            if (breakChunkHeader_) {
-                // only write 2 bytes of size
-                out.push_back(0);
-                out.push_back(0);
-                return out; // truncate
-            }
-
-            std::uint32_t fmtSize = isExtensible_ ? 40 : 16;
-            writeU32LE(out, fmtSize);
-
-            writeU16LE(out, formatTag_);
-            writeU16LE(out, channels_);
-            writeU32LE(out, sampleRate_);
-            std::uint32_t byteRate = sampleRate_ * channels_ * (bitsPerSample_ / 8);
-            writeU32LE(out, byteRate);
-            writeU16LE(out, channels_ * (bitsPerSample_ / 8));
-            writeU16LE(out, bitsPerSample_);
-
-            if (isExtensible_)
-            {
-                writeU16LE(out, 22); // cbSize
-                writeU16LE(out, validBitsPerSample_);
-                writeU32LE(out, 0); // channel mask
-                
-                // GUID
-                std::uint8_t guid[16] = {
-                    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,
-                    0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71
-                }; // PCM default
-                if (isFloat_) {
-                    guid[0] = 0x03; // Float
-                }
-                out.insert(out.end(), guid, guid + 16);
-            }
+            if (!omitData_) writeDataChunk(out);
+            if (duplicateData_) writeDataChunk(out);
+            if (!omitFmt_) writeFmtChunk(out);
+            if (duplicateFmt_) writeFmtChunk(out);
         }
-
-        if (!omitData_)
+        else
         {
-            out.insert(out.end(), {'d', 'a', 't', 'a'});
-            writeU32LE(out, static_cast<std::uint32_t>(dataBytes_.size()));
-            out.insert(out.end(), dataBytes_.begin(), dataBytes_.end());
-
-            if (dataBytes_.size() % 2 != 0 || oddPadding_)
-            {
-                out.push_back(0); // odd padding
-            }
+            if (!omitFmt_) writeFmtChunk(out);
+            if (duplicateFmt_) writeFmtChunk(out);
+            if (!omitData_) writeDataChunk(out);
+            if (duplicateData_) writeDataChunk(out);
         }
 
         std::uint32_t totalSize = static_cast<std::uint32_t>(out.size() - 8);

@@ -67,7 +67,7 @@ run_cli_case("ValidCompact" 0 "\"schemaVersion\":1.*\"tool\":{\"name\":\"lsw_aud
 # 9. valid pretty stdout
 run_cli_case("ValidPretty" 0 "{\n  \"schemaVersion\": 1,.*" "" analyze mono.wav --pretty)
 
-# 10. --output success
+# 10. --output success (stdout and stderr MUST be empty)
 execute_process(COMMAND ${CLI_EXEC} analyze mono.wav --output out.json RESULT_VARIABLE r OUTPUT_VARIABLE o ERROR_VARIABLE e)
 if(NOT r EQUAL 0 OR NOT o STREQUAL "" OR NOT e STREQUAL "")
     message(WARNING "Test 'OutputSuccess' failed")
@@ -82,7 +82,24 @@ if(NOT out1 STREQUAL out2)
     set(TEST_FAILED TRUE)
 endif()
 
-# 12. same input/output rejection
+# 12. block-size invariance
+execute_process(COMMAND ${CLI_EXEC} analyze mono.wav --block-size 10 OUTPUT_VARIABLE out_bs10)
+execute_process(COMMAND ${CLI_EXEC} analyze mono.wav --block-size 500 OUTPUT_VARIABLE out_bs500)
+if(NOT out_bs10 STREQUAL out_bs500)
+    message(WARNING "Test 'BlockSizeInvariance' failed: outputs for block sizes 10 and 500 differ")
+    set(TEST_FAILED TRUE)
+endif()
+
+# 13. existing output replacement
+file(WRITE existing_out.json "stale_content")
+execute_process(COMMAND ${CLI_EXEC} analyze mono.wav --output existing_out.json RESULT_VARIABLE r_rep)
+file(READ existing_out.json rep_content)
+if(NOT r_rep EQUAL 0 OR rep_content STREQUAL "stale_content" OR NOT rep_content MATCHES "\"schemaVersion\":1")
+    message(WARNING "Test 'ExistingOutputReplacement' failed")
+    set(TEST_FAILED TRUE)
+endif()
+
+# 14. same input/output rejection
 run_cli_case("SameInputOutput" 6 "" "Error: Input and output paths.*" analyze mono.wav --output mono.wav)
 
 if(TEST_FAILED)
