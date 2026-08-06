@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## 0.2.0 - Unreleased
+## 0.2.0 - 2026-08-06
 
 - Added Peak Hold with sample-time-based decay.
 - Added channel diagnostic events and stereo diagnostic events.
