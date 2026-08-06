@@ -4,7 +4,7 @@ LSW Audio Diagnostics Core is a compact C++17 static library for real-time-safe 
 
 Developed and maintained under the Liquid Signal Works name.
 
-Version: 0.2.0 (Unreleased)
+Version: 0.2.0
 
 ![LSW Audio Diagnostics Core v0.2.0 dashboard example](docs/images/v0.2-dashboard.png)
 
