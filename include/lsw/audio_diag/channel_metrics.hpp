@@ -11,6 +11,8 @@ namespace lsw::audio_diag
     struct ChannelMetrics
     {
         double samplePeak = 0.0;
+        double heldPeak = 0.0;
+        double heldPeakDbfs = -160.0;
         double smoothedRms = 0.0;
         double rmsDbfs = -160.0;
         double dcOffset = 0.0;

@@ -26,6 +26,8 @@ namespace lsw::audio_diag::detail
     void AtomicChannelMetrics::store(const ChannelMetrics& value) noexcept
     {
         samplePeak_.store(doubleToBits(value.samplePeak), std::memory_order_seq_cst);
+        heldPeak_.store(doubleToBits(value.heldPeak), std::memory_order_seq_cst);
+        heldPeakDbfs_.store(doubleToBits(value.heldPeakDbfs), std::memory_order_seq_cst);
         smoothedRms_.store(doubleToBits(value.smoothedRms), std::memory_order_seq_cst);
         rmsDbfs_.store(doubleToBits(value.rmsDbfs), std::memory_order_seq_cst);
         dcOffset_.store(doubleToBits(value.dcOffset), std::memory_order_seq_cst);
@@ -44,6 +46,8 @@ namespace lsw::audio_diag::detail
     {
         ChannelMetrics value {};
         value.samplePeak = bitsToDouble(samplePeak_.load(std::memory_order_seq_cst));
+        value.heldPeak = bitsToDouble(heldPeak_.load(std::memory_order_seq_cst));
+        value.heldPeakDbfs = bitsToDouble(heldPeakDbfs_.load(std::memory_order_seq_cst));
         value.smoothedRms = bitsToDouble(smoothedRms_.load(std::memory_order_seq_cst));
         value.rmsDbfs = bitsToDouble(rmsDbfs_.load(std::memory_order_seq_cst));
         value.dcOffset = bitsToDouble(dcOffset_.load(std::memory_order_seq_cst));
@@ -56,6 +60,81 @@ namespace lsw::audio_diag::detail
         value.negativeInfinityCount = negativeInfinityCount_.load(std::memory_order_seq_cst);
         value.denormalCount = denormalCount_.load(std::memory_order_seq_cst);
         value.isSilent = isSilent_.load(std::memory_order_seq_cst) != 0U;
+        return value;
+    }
+
+    void AtomicEventState::store(const EventState& value) noexcept
+    {
+        std::uint32_t state = 0U;
+        if (value.active)
+        {
+            state |= 1U;
+        }
+        if (value.latched)
+        {
+            state |= 2U;
+        }
+        state_.store(state, std::memory_order_seq_cst);
+        eventCount_.store(value.eventCount, std::memory_order_seq_cst);
+        currentDurationSamples_.store(value.currentDurationSamples, std::memory_order_seq_cst);
+        longestDurationSamples_.store(value.longestDurationSamples, std::memory_order_seq_cst);
+        lastStartedAtSample_.store(value.lastStartedAtSample, std::memory_order_seq_cst);
+    }
+
+    EventState AtomicEventState::load() const noexcept
+    {
+        EventState value {};
+        const std::uint32_t state = state_.load(std::memory_order_seq_cst);
+        value.active = (state & 1U) != 0U;
+        value.latched = (state & 2U) != 0U;
+        value.eventCount = eventCount_.load(std::memory_order_seq_cst);
+        value.currentDurationSamples = currentDurationSamples_.load(std::memory_order_seq_cst);
+        value.longestDurationSamples = longestDurationSamples_.load(std::memory_order_seq_cst);
+        value.lastStartedAtSample = lastStartedAtSample_.load(std::memory_order_seq_cst);
+        return value;
+    }
+
+    void AtomicChannelEvents::store(const ChannelEvents& value) noexcept
+    {
+        dropout_.store(value.dropout);
+        sustainedClip_.store(value.sustainedClip);
+        dcFault_.store(value.dcFault);
+        invalidBurst_.store(value.invalidBurst);
+        maximumObservedDcOffset_.store(doubleToBits(value.maximumObservedDcOffset),
+                                       std::memory_order_seq_cst);
+        maximumInvalidSamplesPerBlock_.store(value.maximumInvalidSamplesPerBlock,
+                                             std::memory_order_seq_cst);
+    }
+
+    ChannelEvents AtomicChannelEvents::load() const noexcept
+    {
+        ChannelEvents value {};
+        value.dropout = dropout_.load();
+        value.sustainedClip = sustainedClip_.load();
+        value.dcFault = dcFault_.load();
+        value.invalidBurst = invalidBurst_.load();
+        value.maximumObservedDcOffset = bitsToDouble(
+            maximumObservedDcOffset_.load(std::memory_order_seq_cst));
+        value.maximumInvalidSamplesPerBlock = maximumInvalidSamplesPerBlock_.load(
+            std::memory_order_seq_cst);
+        return value;
+    }
+
+    void AtomicStereoEvents::store(const StereoEvents& value) noexcept
+    {
+        reversedPolarity_.store(value.reversedPolarity);
+        identicalChannels_.store(value.identicalChannels);
+        leftOnly_.store(value.leftOnly);
+        rightOnly_.store(value.rightOnly);
+    }
+
+    StereoEvents AtomicStereoEvents::load() const noexcept
+    {
+        StereoEvents value {};
+        value.reversedPolarity = reversedPolarity_.load();
+        value.identicalChannels = identicalChannels_.load();
+        value.leftOnly = leftOnly_.load();
+        value.rightOnly = rightOnly_.load();
         return value;
     }
 
@@ -116,6 +195,9 @@ namespace lsw::audio_diag::detail
         channels_[0].store(value.channels[0]);
         channels_[1].store(value.channels[1]);
         stereo_.store(value.stereo);
+        channelEvents_[0].store(value.channelEvents[0]);
+        channelEvents_[1].store(value.channelEvents[1]);
+        stereoEvents_.store(value.stereoEvents);
         sequence_.fetch_add(1U, std::memory_order_seq_cst);
     }
 
@@ -139,6 +221,9 @@ namespace lsw::audio_diag::detail
             value.channels[0] = channels_[0].load();
             value.channels[1] = channels_[1].load();
             value.stereo = stereo_.load();
+            value.channelEvents[0] = channelEvents_[0].load();
+            value.channelEvents[1] = channelEvents_[1].load();
+            value.stereoEvents = stereoEvents_.load();
 
             if (sequence_.load(std::memory_order_seq_cst) == before)
             {
@@ -164,6 +249,36 @@ namespace lsw::audio_diag
             return isFinite(value) && value >= -1.0 && value <= 1.0;
         }
 
+        [[nodiscard]] StereoMetrics makeStereoMetrics(const AnalyzerConfig& config,
+                                                       const ChannelMetrics& left,
+                                                       const ChannelMetrics& right,
+                                                       const detail::CorrelationTracker& tracker) noexcept
+        {
+            StereoMetrics result {};
+            result.correlation = tracker.correlation();
+            result.leftRms = left.smoothedRms;
+            result.rightRms = right.smoothedRms;
+            result.channelBalanceDb = left.rmsDbfs - right.rmsDbfs;
+            result.monoCompatibilityScore = std::max(
+                0.0, std::min(1.0, (result.correlation + 1.0) * 0.5));
+
+            const bool leftActive = left.rmsDbfs >= config.activeSignalThresholdDbfs;
+            const bool rightActive = right.rmsDbfs >= config.activeSignalThresholdDbfs;
+            const bool rightSilent = right.rmsDbfs < config.silenceThresholdDbfs;
+            const bool leftSilent = left.rmsDbfs < config.silenceThresholdDbfs;
+            const bool correlationAvailable = tracker.isAvailable();
+
+            result.identicalChannels = leftActive && rightActive && correlationAvailable
+                                       && result.correlation >= config.identicalCorrelationThreshold
+                                       && tracker.maximumAbsoluteDifference()
+                                              <= config.identicalChannelTolerance;
+            result.reversedPolarity = leftActive && rightActive && correlationAvailable
+                                      && result.correlation <= config.reversedPolarityThreshold;
+            result.leftOnly = leftActive && rightSilent;
+            result.rightOnly = rightActive && leftSilent;
+            return result;
+        }
+
         [[nodiscard]] PrepareResult validateConfig(const AnalyzerConfig& config) noexcept
         {
             if (!isFinite(config.sampleRate) || config.sampleRate <= 0.0)
@@ -181,13 +296,22 @@ namespace lsw::audio_diag
             if (!isFinite(config.levelTimeConstantSeconds) || config.levelTimeConstantSeconds <= 0.0
                 || !isFinite(config.dcTimeConstantSeconds) || config.dcTimeConstantSeconds <= 0.0
                 || !isFinite(config.correlationTimeConstantSeconds) || config.correlationTimeConstantSeconds <= 0.0
-                || !isFinite(config.silenceHoldSeconds) || config.silenceHoldSeconds < 0.0)
+                || !isFinite(config.silenceHoldSeconds) || config.silenceHoldSeconds < 0.0
+                || !isFinite(config.peakHoldSeconds) || config.peakHoldSeconds < 0.0
+                || !isFinite(config.dropoutHoldSeconds) || config.dropoutHoldSeconds < 0.0
+                || !isFinite(config.dropoutRecoverySeconds) || config.dropoutRecoverySeconds < 0.0
+                || !isFinite(config.dcFaultHoldSeconds) || config.dcFaultHoldSeconds < 0.0
+                || !isFinite(config.dcFaultRecoverySeconds) || config.dcFaultRecoverySeconds < 0.0)
             {
                 return PrepareResult::invalidTimeConstant;
             }
             if (!isFinite(config.silenceThresholdDbfs) || !isFinite(config.activeSignalThresholdDbfs)
                 || !isFinite(config.clipThreshold) || config.clipThreshold <= 0.0
-                || config.activeSignalThresholdDbfs < config.silenceThresholdDbfs)
+                || !isFinite(config.dropoutThresholdDbfs)
+                || !isFinite(config.dcFaultThreshold) || config.dcFaultThreshold <= 0.0
+                || !isFinite(config.peakHoldDecayDbPerSecond) || config.peakHoldDecayDbPerSecond <= 0.0
+                || config.silenceThresholdDbfs > config.dropoutThresholdDbfs
+                || config.dropoutThresholdDbfs >= config.activeSignalThresholdDbfs)
             {
                 return PrepareResult::invalidThreshold;
             }
@@ -196,6 +320,10 @@ namespace lsw::audio_diag
                 || !isValidCorrelation(config.reversedPolarityThreshold))
             {
                 return PrepareResult::invalidTolerance;
+            }
+            if (config.sustainedClipMinimumSamples == 0U || config.invalidBurstThresholdPerBlock == 0U)
+            {
+                return PrepareResult::invalidThreshold;
             }
             return PrepareResult::success;
         }
@@ -237,7 +365,10 @@ namespace lsw::audio_diag
         config_ = other.config_;
         levelTrackers_[0] = other.levelTrackers_[0];
         levelTrackers_[1] = other.levelTrackers_[1];
+        eventTrackers_[0] = other.eventTrackers_[0];
+        eventTrackers_[1] = other.eventTrackers_[1];
         correlationTracker_ = other.correlationTracker_;
+        stereoEventTracker_ = other.stereoEventTracker_;
         prepared_ = other.prepared_;
         processedSampleCount_ = other.processedSampleCount_;
         processedBlockCount_ = other.processedBlockCount_;
@@ -250,7 +381,10 @@ namespace lsw::audio_diag
         other.stickyFlags_ = 0U;
         other.levelTrackers_[0].reset();
         other.levelTrackers_[1].reset();
+        other.eventTrackers_[0].reset();
+        other.eventTrackers_[1].reset();
         other.correlationTracker_.reset();
+        other.stereoEventTracker_.reset();
         other.publishSnapshot();
     }
 
@@ -274,10 +408,64 @@ namespace lsw::audio_diag
     {
         levelTrackers_[0].configure(config_);
         levelTrackers_[1].configure(config_);
+        eventTrackers_[0].configure(config_);
+        eventTrackers_[1].configure(config_);
         correlationTracker_.configure(config_);
+        stereoEventTracker_.reset();
         processedSampleCount_ = 0U;
         processedBlockCount_ = 0U;
         stickyFlags_ = 0U;
+        publishSnapshot();
+    }
+
+    template <typename SampleType>
+    void Analyzer<SampleType>::resetLevels() noexcept
+    {
+        if (!prepared_)
+        {
+            return;
+        }
+        levelTrackers_[0].resetLevels();
+        levelTrackers_[1].resetLevels();
+        eventTrackers_[0].resetLevelDetectors();
+        eventTrackers_[1].resetLevelDetectors();
+        correlationTracker_.reset();
+        publishSnapshot();
+    }
+
+    template <typename SampleType>
+    void Analyzer<SampleType>::resetCounters() noexcept
+    {
+        if (!prepared_)
+        {
+            return;
+        }
+        levelTrackers_[0].resetCounters();
+        levelTrackers_[1].resetCounters();
+        publishSnapshot();
+    }
+
+    template <typename SampleType>
+    void Analyzer<SampleType>::clearDiagnosticFlags() noexcept
+    {
+        if (!prepared_)
+        {
+            return;
+        }
+        stickyFlags_ = 0U;
+        publishSnapshot();
+    }
+
+    template <typename SampleType>
+    void Analyzer<SampleType>::clearEvents() noexcept
+    {
+        if (!prepared_)
+        {
+            return;
+        }
+        eventTrackers_[0].clearEvents();
+        eventTrackers_[1].clearEvents();
+        stereoEventTracker_.clearEvents();
         publishSnapshot();
     }
 
@@ -305,24 +493,38 @@ namespace lsw::audio_diag
             return;
         }
 
+        bool validInput = numberOfSamples != 0U;
+        for (std::size_t channel = 0U; channel < config_.numberOfChannels; ++channel)
+        {
+            if (channel >= numberOfChannels || channels[channel] == nullptr)
+            {
+                stickyFlags_ |= static_cast<std::uint32_t>(DiagnosticFlags::nullInput);
+                validInput = false;
+            }
+        }
+        if (!validInput)
+        {
+            if (numberOfSamples == 0U)
+            {
+                processedBlockCount_ = addSaturated(processedBlockCount_, 1U);
+            }
+            publishSnapshot();
+            return;
+        }
+
         const SampleType* inputs[maximumSupportedChannels] { nullptr, nullptr };
         for (std::size_t channel = 0U; channel < config_.numberOfChannels; ++channel)
         {
-            if (channel < numberOfChannels)
-            {
-                inputs[channel] = channels[channel];
-            }
-            if (inputs[channel] == nullptr)
-            {
-                stickyFlags_ |= static_cast<std::uint32_t>(DiagnosticFlags::nullInput);
-            }
+            inputs[channel] = channels[channel];
             levelTrackers_[channel].beginBlock();
+            eventTrackers_[channel].beginBlock();
         }
         if (config_.numberOfChannels == maximumSupportedChannels)
         {
             correlationTracker_.beginBlock();
         }
 
+        const std::uint64_t blockStartSample = processedSampleCount_;
         for (std::size_t sampleIndex = 0U; sampleIndex < numberOfSamples; ++sampleIndex)
         {
             double samples[maximumSupportedChannels] { 0.0, 0.0 };
@@ -340,6 +542,9 @@ namespace lsw::audio_diag
                     classifications[channel] = sanitized.classification;
                 }
                 levelTrackers_[channel].processSample(samples[channel], classifications[channel]);
+                eventTrackers_[channel].processSample(
+                    std::abs(samples[channel]) >= config_.clipThreshold, classifications[channel],
+                    addSaturated(blockStartSample, sampleIndex));
             }
             if (config_.numberOfChannels == maximumSupportedChannels)
             {
@@ -350,6 +555,17 @@ namespace lsw::audio_diag
         for (std::size_t channel = 0U; channel < config_.numberOfChannels; ++channel)
         {
             levelTrackers_[channel].endBlock(numberOfSamples);
+            eventTrackers_[channel].endBlock(levelTrackers_[channel].metrics(), numberOfSamples,
+                                             blockStartSample);
+        }
+        if (config_.numberOfChannels == maximumSupportedChannels)
+        {
+            const StereoMetrics stereo = makeStereoMetrics(config_, levelTrackers_[0].metrics(),
+                                                            levelTrackers_[1].metrics(),
+                                                            correlationTracker_);
+            stereoEventTracker_.update(stereo.reversedPolarity, stereo.identicalChannels,
+                                       stereo.leftOnly, stereo.rightOnly, numberOfSamples,
+                                       blockStartSample);
         }
         processedSampleCount_ = addSaturated(processedSampleCount_, numberOfSamples);
         processedBlockCount_ = addSaturated(processedBlockCount_, 1U);
@@ -379,6 +595,9 @@ namespace lsw::audio_diag
         snapshot.processedBlockCount = processedBlockCount_;
         snapshot.channels[0] = levelTrackers_[0].metrics();
         snapshot.channels[1] = levelTrackers_[1].metrics();
+        snapshot.channelEvents[0] = eventTrackers_[0].events();
+        snapshot.channelEvents[1] = eventTrackers_[1].events();
+        snapshot.stereoEvents = stereoEventTracker_.events();
 
         DiagnosticFlags flags = static_cast<DiagnosticFlags>(stickyFlags_)
                                 | DiagnosticFlags::prepared;
@@ -403,28 +622,7 @@ namespace lsw::audio_diag
         {
             const ChannelMetrics& left = snapshot.channels[0];
             const ChannelMetrics& right = snapshot.channels[1];
-            snapshot.stereo.correlation = correlationTracker_.correlation();
-            snapshot.stereo.leftRms = left.smoothedRms;
-            snapshot.stereo.rightRms = right.smoothedRms;
-            snapshot.stereo.channelBalanceDb = left.rmsDbfs - right.rmsDbfs;
-            snapshot.stereo.monoCompatibilityScore = std::max(
-                0.0, std::min(1.0, (snapshot.stereo.correlation + 1.0) * 0.5));
-
-            const bool leftActive = left.rmsDbfs >= config_.activeSignalThresholdDbfs;
-            const bool rightActive = right.rmsDbfs >= config_.activeSignalThresholdDbfs;
-            const bool rightSilent = right.rmsDbfs < config_.silenceThresholdDbfs;
-            const bool leftSilent = left.rmsDbfs < config_.silenceThresholdDbfs;
-            const bool correlationAvailable = correlationTracker_.isAvailable();
-
-            snapshot.stereo.identicalChannels = leftActive && rightActive && correlationAvailable
-                                                && snapshot.stereo.correlation >= config_.identicalCorrelationThreshold
-                                                && correlationTracker_.maximumAbsoluteDifference()
-                                                       <= config_.identicalChannelTolerance;
-            snapshot.stereo.reversedPolarity = leftActive && rightActive && correlationAvailable
-                                               && snapshot.stereo.correlation
-                                                      <= config_.reversedPolarityThreshold;
-            snapshot.stereo.leftOnly = leftActive && rightSilent;
-            snapshot.stereo.rightOnly = rightActive && leftSilent;
+            snapshot.stereo = makeStereoMetrics(config_, left, right, correlationTracker_);
 
             if (snapshot.stereo.identicalChannels)
             {

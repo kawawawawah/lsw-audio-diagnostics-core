@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-project(LSWAudioDiagnosticsCore VERSION 0.1.0 LANGUAGES CXX)
+project(LSWAudioDiagnosticsCore VERSION 0.2.0 LANGUAGES CXX)
 
 option(LSW_AUDIO_DIAG_BUILD_TESTS "Build unit tests" ON)
 option(LSW_AUDIO_DIAG_BUILD_EXAMPLES "Build examples" ON)
@@ -16,6 +16,7 @@ include(cmake/CompilerWarnings.cmake)
 add_library(lsw_audio_diagnostics STATIC
     src/analyzer.cpp
     src/correlation_tracker.cpp
+    src/event_tracker.cpp
     src/finite_value_guard.cpp
     src/level_tracker.cpp)
 add_library(LSW::AudioDiagnostics ALIAS lsw_audio_diagnostics)
@@ -40,6 +41,7 @@ if(LSW_AUDIO_DIAG_BUILD_TESTS)
         tests/analyzer_tests.cpp
         tests/correlation_tests.cpp
         tests/dc_offset_tests.cpp
+        tests/event_tests.cpp
         tests/finite_value_tests.cpp
         tests/level_tests.cpp)
     target_link_libraries(lsw_audio_diagnostics_tests PRIVATE LSW::AudioDiagnostics Threads::Threads)
