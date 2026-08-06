@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 HIROAKI KAWAKITA
+# SPDX-License-Identifier: MIT
+
+build/
+install/
+build-consumer-test/
+out/
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+*.obj
+*.pdb
+*.idb
+*.ilk
+*.exe
+*.lib
+*.dll
+*.dylib
+*.so
+*.a
+*.log

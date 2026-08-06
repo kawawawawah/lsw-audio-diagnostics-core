@@ -1,0 +1,24 @@
+name: Windows
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+          -DLSW_AUDIO_DIAG_BUILD_TESTS=ON
+          -DLSW_AUDIO_DIAG_BUILD_EXAMPLES=ON
+          -DLSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS=ON
+      - name: Release clean build
+        run: cmake --build build --config Release --clean-first
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Example
+        run: .\build\Release\lsw_audio_diagnostics_example.exe

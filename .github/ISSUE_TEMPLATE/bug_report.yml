@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a reproducible diagnostic-library defect.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS, compiler, compiler version, and CMake version
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: Build type, sample rate, block size, and channel count
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps and minimal code sample
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true

@@ -1,0 +1,30 @@
+name: CodeQL
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: c-cpp
+          build-mode: manual
+      - run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          -DLSW_AUDIO_DIAG_BUILD_TESTS=ON
+          -DLSW_AUDIO_DIAG_BUILD_EXAMPLES=ON
+          -DLSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS=ON
+      - run: cmake --build build --clean-first
+      - uses: github/codeql-action/analyze@v3

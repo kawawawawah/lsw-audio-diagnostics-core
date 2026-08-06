@@ -1,0 +1,24 @@
+name: macOS
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          -DLSW_AUDIO_DIAG_BUILD_TESTS=ON
+          -DLSW_AUDIO_DIAG_BUILD_EXAMPLES=ON
+          -DLSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS=ON
+      - name: Release clean build
+        run: cmake --build build --clean-first
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Example
+        run: ./build/lsw_audio_diagnostics_example
