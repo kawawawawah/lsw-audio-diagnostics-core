@@ -20,3 +20,8 @@ This avoids a mutex and avoids `std::atomic<Snapshot>` or `std::atomic<double>`.
 ## Failure handling
 
 `prepare()` returns `PrepareResult` rather than throwing. `process()` ignores pre-prepare calls, records null input, channel-count mismatch, and oversized-block conditions in sticky diagnostic flags, and does not advance events for null required channel pointers or zero-sample blocks. Invalid floating-point samples are substituted with zero after their counters are updated.
+
+## Offline tools
+
+v0.3.0 introduces an offline toolchain (`lsw::audio_diag::offline`), distributed as a separate static library target and CLI application (`lsw_audio_diagnostics_cli`).
+The offline layer is strictly decoupled from the core analyzer: it delegates to the real-time core for processing while encapsulating the file I/O, streaming block boundaries, string formatting, and JSON generation logic. The core library retains zero knowledge of files, command-line arguments, or JSON structures.

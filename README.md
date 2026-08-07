@@ -4,7 +4,7 @@ LSW Audio Diagnostics Core is a compact C++17 static library for real-time-safe 
 
 Developed and maintained under the Liquid Signal Works name.
 
-Version: 0.2.0
+Version: 0.3.0
 
 ![LSW Audio Diagnostics Core v0.2.0 dashboard example](docs/images/v0.2-dashboard.png)
 
@@ -12,6 +12,8 @@ Version: 0.2.0
 
 ## Features
 
+- **New in v0.3.0**: Offline WAV Analyzer CLI (`lsw_audio_diagnostics_cli`) providing deterministic JSON reports.
+- **New in v0.3.0**: Streaming WAV Reader (PCM and IEEE Float, `WAVE_FORMAT_EXTENSIBLE`).
 - Float and double processing
 - Sample peak, Peak Hold with sample-time-based decay, accumulated maximum absolute sample, smoothed RMS, dBFS, and DC offset
 - Clip, silence, NaN, positive/negative infinity, and denormal detection
@@ -33,17 +35,57 @@ cmake -S . -B build `
   -A x64 `
   -DLSW_AUDIO_DIAG_BUILD_TESTS=ON `
   -DLSW_AUDIO_DIAG_BUILD_EXAMPLES=ON `
+  -DLSW_AUDIO_DIAG_BUILD_CLI=ON `
   -DLSW_AUDIO_DIAG_BUILD_WINDOWS_DASHBOARD=ON `
   -DLSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS=ON
 
 cmake --build build --config Release --clean-first
 ctest --test-dir build -C Release --output-on-failure
 .\build\Release\lsw_audio_diagnostics_example.exe
+.\build\Release\lsw_audio_diagnostics_cli.exe --help
 ```
 
 On Linux or macOS, omit the Visual Studio generator and use `-DCMAKE_BUILD_TYPE=Release`.
 
 `LSW_AUDIO_DIAG_BUILD_WINDOWS_DASHBOARD` is OFF by default and only creates a target on Windows. The Dashboard is a Win32/GDI optional example, not part of the core library: it uses no audio device I/O, no network access, and no external assets. It drives `Analyzer<float>` with deterministic synthetic signals and is the source of the screenshot above.
+
+## Command-Line Interface (CLI)
+
+The Offline WAV Analyzer CLI provides deterministic JSON reports for WAV files.
+
+```bash
+lsw_audio_diagnostics_cli analyze <input.wav> [--output <report.json>] [--pretty] [--block-size <frames>]
+```
+
+- **`analyze input.wav`**: Analyzes the given WAV file.
+- **`--output <report.json>`**: Writes the JSON report to the specified file atomically. If omitted, outputs to stdout.
+- **`--pretty`**: Formats the JSON output with indentation and line breaks.
+- **`--block-size <frames>`**: Specifies the processing block size (default: 4096, max: 1048576). The final JSON output is deterministic and block-size invariant.
+
+### Exit Codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+| `2` | Invalid arguments |
+| `3` | Missing input file or read failure |
+| `4` | Malformed or unsupported WAV |
+| `5` | Internal error (e.g., memory exhaustion or preparation failure) |
+| `6` | Output failure (e.g., cannot write to destination or input == output) |
+
+### Supported Audio Formats
+- Container: RIFF/WAVE, including `WAVE_FORMAT_EXTENSIBLE`
+- Channels: 1 (Mono), 2 (Stereo)
+- Sample Rates: > 0 Hz
+- Bit Depths (PCM): 8, 16, 24, 32
+- Bit Depths (IEEE Float): 32, 64
+
+### Standard Streams
+- **stdout**: JSON report when `--output` is omitted.
+- **stderr**: Error messages. Empty on success.
+
+### JSON Output
+The generated report uses `schemaVersion: 1`. It accurately records the `input` path, deterministic numeric fields (non-finite values are serialized as `null`), and detailed channel and stereo metrics based on the real-time core. The core logic remains entirely decoupled from JSON and file I/O operations.
 
 ## Basic use
 

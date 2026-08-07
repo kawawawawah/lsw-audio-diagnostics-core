@@ -161,14 +161,14 @@ namespace
     }
 }
 
-LSW_TEST_CASE(version_constants_and_string_match_v0_2_0)
+LSW_TEST_CASE(version_constants_and_string_match_v0_3_0)
 {
     LSW_CHECK(sameInt(LSW_AUDIO_DIAG_VERSION_MAJOR, 0));
-    LSW_CHECK(sameInt(LSW_AUDIO_DIAG_VERSION_MINOR, 2));
+    LSW_CHECK(sameInt(LSW_AUDIO_DIAG_VERSION_MINOR, 3));
     LSW_CHECK(sameInt(LSW_AUDIO_DIAG_VERSION_PATCH, 0));
     LSW_CHECK(sameInt(lsw::audio_diag::versionMajor, 0));
-    LSW_CHECK(sameInt(lsw::audio_diag::versionMinor, 2));
+    LSW_CHECK(sameInt(lsw::audio_diag::versionMinor, 3));
     LSW_CHECK(sameInt(lsw::audio_diag::versionPatch, 0));
-    LSW_CHECK_EQ(std::strcmp(LSW_AUDIO_DIAG_VERSION_STRING, "0.2.0"), 0);
-    LSW_CHECK_EQ(std::strcmp(lsw::audio_diag::versionString, "0.2.0"), 0);
+    LSW_CHECK_EQ(std::strcmp(LSW_AUDIO_DIAG_VERSION_STRING, "0.3.0"), 0);
+    LSW_CHECK_EQ(std::strcmp(lsw::audio_diag::versionString, "0.3.0"), 0);
 }

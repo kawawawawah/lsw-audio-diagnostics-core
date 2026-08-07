@@ -3,10 +3,11 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-project(LSWAudioDiagnosticsCore VERSION 0.2.0 LANGUAGES CXX)
+project(LSWAudioDiagnosticsCore VERSION 0.3.0 LANGUAGES CXX)
 
 option(LSW_AUDIO_DIAG_BUILD_TESTS "Build unit tests" ON)
 option(LSW_AUDIO_DIAG_BUILD_EXAMPLES "Build examples" ON)
+option(LSW_AUDIO_DIAG_BUILD_CLI "Build the WAV analyzer command-line tool" ON)
 option(LSW_AUDIO_DIAG_BUILD_WINDOWS_DASHBOARD "Build the optional Windows dashboard example" OFF)
 option(LSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 
@@ -50,6 +51,50 @@ if(LSW_AUDIO_DIAG_BUILD_TESTS)
     set_target_properties(lsw_audio_diagnostics_tests PROPERTIES CXX_EXTENSIONS OFF)
     lsw_audio_diag_set_compiler_warnings(lsw_audio_diagnostics_tests ${LSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS})
     add_test(NAME lsw_audio_diagnostics_tests COMMAND lsw_audio_diagnostics_tests)
+endif()
+
+if(LSW_AUDIO_DIAG_BUILD_CLI)
+    add_library(lsw_audio_diagnostics_offline STATIC
+        src/offline/wav_reader.cpp
+        src/offline/json_report_writer.cpp)
+    target_compile_features(lsw_audio_diagnostics_offline PUBLIC cxx_std_17)
+    target_include_directories(lsw_audio_diagnostics_offline PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+    target_link_libraries(lsw_audio_diagnostics_offline PRIVATE LSW::AudioDiagnostics)
+    lsw_audio_diag_set_compiler_warnings(lsw_audio_diagnostics_offline ${LSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS})
+
+    add_executable(lsw_audio_diagnostics_cli apps/cli/main.cpp apps/cli/cli_arguments.cpp)
+    target_link_libraries(lsw_audio_diagnostics_cli PRIVATE LSW::AudioDiagnostics lsw_audio_diagnostics_offline)
+    target_compile_features(lsw_audio_diagnostics_cli PRIVATE cxx_std_17)
+    set_target_properties(lsw_audio_diagnostics_cli PROPERTIES CXX_EXTENSIONS OFF)
+    lsw_audio_diag_set_compiler_warnings(lsw_audio_diagnostics_cli ${LSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS})
+
+    if(LSW_AUDIO_DIAG_BUILD_TESTS)
+        add_executable(lsw_audio_diagnostics_cli_tests
+            tests/test_main.cpp
+            tests/cli_argument_tests.cpp
+            apps/cli/cli_arguments.cpp
+            tests/wav_reader_tests.cpp
+            tests/json_report_tests.cpp
+            tests/wav_fixture_builder.cpp)
+        target_link_libraries(lsw_audio_diagnostics_cli_tests PRIVATE LSW::AudioDiagnostics lsw_audio_diagnostics_offline Threads::Threads)
+        target_compile_features(lsw_audio_diagnostics_cli_tests PRIVATE cxx_std_17)
+        set_target_properties(lsw_audio_diagnostics_cli_tests PROPERTIES CXX_EXTENSIONS OFF)
+        lsw_audio_diag_set_compiler_warnings(lsw_audio_diagnostics_cli_tests ${LSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS})
+        add_test(NAME lsw_audio_diagnostics_cli_tests COMMAND lsw_audio_diagnostics_cli_tests)
+
+        add_executable(lsw_audio_diagnostics_cli_fixture_generator
+            tests/cli_fixture_generator.cpp
+            tests/wav_fixture_builder.cpp)
+        target_link_libraries(lsw_audio_diagnostics_cli_fixture_generator PRIVATE LSW::AudioDiagnostics lsw_audio_diagnostics_offline)
+        target_compile_features(lsw_audio_diagnostics_cli_fixture_generator PRIVATE cxx_std_17)
+        set_target_properties(lsw_audio_diagnostics_cli_fixture_generator PROPERTIES CXX_EXTENSIONS OFF)
+        lsw_audio_diag_set_compiler_warnings(lsw_audio_diagnostics_cli_fixture_generator ${LSW_AUDIO_DIAG_ENABLE_WARNINGS_AS_ERRORS})
+
+        add_test(NAME cli_e2e_tests COMMAND ${CMAKE_COMMAND}
+            -DCLI_EXEC=$<TARGET_FILE:lsw_audio_diagnostics_cli>
+            -DFIXTURE_GEN_EXEC=$<TARGET_FILE:lsw_audio_diagnostics_cli_fixture_generator>
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_cli_case.cmake)
+    endif()
 endif()
 
 if(LSW_AUDIO_DIAG_BUILD_EXAMPLES)

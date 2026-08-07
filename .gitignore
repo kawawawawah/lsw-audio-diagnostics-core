@@ -1,12 +1,10 @@
 # SPDX-FileCopyrightText: 2026 HIROAKI KAWAKITA
 # SPDX-License-Identifier: MIT
 
-build/
-install/
-build-consumer-test/
-build-consumer-v010-compat/
-build-consumer-v020/
-out/
+/build/
+/build-*/
+/install/
+/out/
 .vs/
 *.user
 *.suo
