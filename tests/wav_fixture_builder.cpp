@@ -5,6 +5,7 @@
 #include <fstream>
 #include <cstring>
 #include <stdexcept>
+#include <limits>
 
 namespace lsw::audio_diag::test
 {
@@ -243,13 +244,13 @@ namespace lsw::audio_diag::test
             return out;
         }
 
-        for (char c : riffHeader_) out.push_back(c);
+        for (char c : riffHeader_) out.push_back(static_cast<std::uint8_t>(static_cast<unsigned char>(c)));
         writeU32LE(out, 0); // Placeholder for size
-        for (char c : waveHeader_) out.push_back(c);
+        for (char c : waveHeader_) out.push_back(static_cast<std::uint8_t>(static_cast<unsigned char>(c)));
 
         for (const auto& ch : extraChunks_)
         {
-            for (char c : ch.id) out.push_back(c);
+            for (char c : ch.id) out.push_back(static_cast<std::uint8_t>(static_cast<unsigned char>(c)));
             writeU32LE(out, static_cast<std::uint32_t>(ch.data.size()));
             out.insert(out.end(), ch.data.begin(), ch.data.end());
             if (ch.data.size() % 2 != 0) out.push_back(0); // padding
@@ -286,6 +287,22 @@ namespace lsw::audio_diag::test
         std::vector<std::uint8_t> data = build();
         std::ofstream out(path, std::ios::binary);
         if (!out) throw std::runtime_error("Failed to create fixture file");
-        out.write(reinterpret_cast<const char*>(data.data()), data.size());
+
+        if (data.size() > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max()))
+        {
+            throw std::runtime_error("Fixture data size exceeds stream write limit");
+        }
+        std::streamsize writeSize = static_cast<std::streamsize>(data.size());
+        out.write(reinterpret_cast<const char*>(data.data()), writeSize);
+        out.flush();
+        if (!out || out.fail())
+        {
+            throw std::runtime_error("Failed to write fixture file data");
+        }
+        out.close();
+        if (out.fail())
+        {
+            throw std::runtime_error("Failed to close fixture file");
+        }
     }
 }
