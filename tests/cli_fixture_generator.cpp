@@ -35,6 +35,16 @@ int main(int argc, char** argv)
                 .addSample(-0.5f).addSample(-0.5f)
                 .writeToFile(path);
         }
+        else if (type == "partial_4097")
+        {
+            WavFixtureBuilder builder;
+            builder.setChannels(1).setSampleRate(48000).setBitsPerSample(16);
+            for (int i = 0; i < 4097; ++i)
+            {
+                builder.addSample(static_cast<std::int16_t>(100));
+            }
+            builder.writeToFile(path);
+        }
         else if (type == "malformed")
         {
             WavFixtureBuilder()
