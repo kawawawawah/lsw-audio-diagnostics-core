@@ -14,13 +14,13 @@
 #include <fstream>
 #include <system_error>
 #include <exception>
-#include <limits>
+#include <optional>
 
 namespace fs = std::filesystem;
 
 namespace
 {
-    fs::path getUniqueSiblingPath(const fs::path& basePath, const std::string& extension)
+    std::optional<fs::path> getUniqueSiblingPath(const fs::path& basePath, const std::string& extension)
     {
         std::error_code ec;
         fs::path parent = basePath.parent_path();
@@ -31,15 +31,15 @@ namespace
         {
             std::string candidateName = filename + "." + extension + "." + std::to_string(counter);
             fs::path candidate = parent.empty() ? fs::path(candidateName) : (parent / candidateName);
-            if (!fs::exists(candidate, ec))
+            bool exists = fs::exists(candidate, ec);
+            if (!ec && !exists)
             {
                 return candidate;
             }
             ++counter;
         }
 
-        std::string defaultName = filename + "." + extension;
-        return parent.empty() ? fs::path(defaultName) : (parent / defaultName);
+        return std::nullopt;
     }
 }
 
@@ -185,8 +185,17 @@ int main(int argc, char** argv)
         if (hasOutput)
         {
             fs::path outPath(outputPath);
-            fs::path tempPath = getUniqueSiblingPath(outPath, "tmp");
-            fs::path backupPath = getUniqueSiblingPath(outPath, "bak");
+            auto optTempPath = getUniqueSiblingPath(outPath, "tmp");
+            auto optBackupPath = getUniqueSiblingPath(outPath, "bak");
+
+            if (!optTempPath.has_value() || !optBackupPath.has_value())
+            {
+                std::cerr << "Error: Failed to secure unique output file path\n";
+                return 6;
+            }
+
+            fs::path tempPath = optTempPath.value();
+            fs::path backupPath = optBackupPath.value();
 
             std::ofstream out(tempPath, std::ios::binary);
             if (!out)
