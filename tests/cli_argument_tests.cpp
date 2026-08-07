@@ -194,4 +194,28 @@ namespace lsw::audio_diag::test
         LSW_CHECK(!res.success);
         LSW_CHECK_EQ(res.exitCode, 2);
     }
+
+    LSW_TEST_CASE(WavReadStatus_ExitCodeMapping_Success)
+    {
+        LSW_CHECK_EQ(mapWavReadStatusToExitCode(
+            lsw::audio_diag::offline::WavReadStatus::success), 0);
+    }
+
+    LSW_TEST_CASE(WavReadStatus_ExitCodeMapping_EndOfStream)
+    {
+        LSW_CHECK_EQ(mapWavReadStatusToExitCode(
+            lsw::audio_diag::offline::WavReadStatus::end_of_stream), 0);
+    }
+
+    LSW_TEST_CASE(WavReadStatus_ExitCodeMapping_ReadFailed)
+    {
+        LSW_CHECK_EQ(mapWavReadStatusToExitCode(
+            lsw::audio_diag::offline::WavReadStatus::read_failed), 3);
+    }
+
+    LSW_TEST_CASE(WavReadStatus_ExitCodeMapping_MalformedStream)
+    {
+        LSW_CHECK_EQ(mapWavReadStatusToExitCode(
+            lsw::audio_diag::offline::WavReadStatus::malformed_stream), 4);
+    }
 }

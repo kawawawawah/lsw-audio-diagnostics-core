@@ -225,12 +225,27 @@ namespace lsw::audio_diag::test
     void WavFixtureBuilder::writeDataChunk(std::vector<std::uint8_t>& out) const
     {
         out.insert(out.end(), {'d', 'a', 't', 'a'});
-        writeU32LE(out, static_cast<std::uint32_t>(dataBytes_.size()));
-        out.insert(out.end(), dataBytes_.begin(), dataBytes_.end());
 
-        if (dataBytes_.size() % 2 != 0 || oddPadding_)
+        if (hasTruncatedDataDecl_)
         {
-            out.push_back(0); // odd padding
+            // Declare a larger payload size than we actually write
+            writeU32LE(out, truncatedDataDeclaredSize_);
+            out.insert(out.end(), dataBytes_.begin(), dataBytes_.end());
+            // No padding -- intentionally truncated
+        }
+        else
+        {
+            writeU32LE(out, static_cast<std::uint32_t>(dataBytes_.size()));
+            out.insert(out.end(), dataBytes_.begin(), dataBytes_.end());
+
+            if (!omitRequiredOddPadding_ && (dataBytes_.size() % 2 != 0 || oddPadding_))
+            {
+                out.push_back(0); // odd padding
+            }
+            else if (omitRequiredOddPadding_)
+            {
+                // Intentionally omit the required padding byte for odd-sized data
+            }
         }
     }
 
@@ -269,6 +284,19 @@ namespace lsw::audio_diag::test
             if (duplicateFmt_) writeFmtChunk(out);
             if (!omitData_) writeDataChunk(out);
             if (duplicateData_) writeDataChunk(out);
+        }
+
+        // Write a chunk whose header lands inside the RIFF boundary but whose
+        // declared payload size overruns the boundary, before we seal the RIFF size.
+        if (hasAppendBeyondRiff_)
+        {
+            for (char c : appendBeyondRiffId_)
+                out.push_back(static_cast<std::uint8_t>(static_cast<unsigned char>(c)));
+            // Declared size = everything after 'WAVE' + oversizeBy, which overruns RIFF end
+            std::uint32_t oversizeDecl = static_cast<std::uint32_t>(out.size() - 12)
+                                         + appendBeyondRiffOversizeBy_;
+            writeU32LE(out, oversizeDecl);
+            // No actual payload bytes written - declared size already overruns
         }
 
         std::uint32_t totalSize = static_cast<std::uint32_t>(out.size() - 8);

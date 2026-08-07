@@ -48,6 +48,9 @@ namespace lsw::audio_diag::test
         WavFixtureBuilder& addUnknownChunk(const std::string& id, const std::vector<std::uint8_t>& data);
         WavFixtureBuilder& breakChunkHeader(bool breakIt);
         WavFixtureBuilder& setOddPadding(bool padding);
+        WavFixtureBuilder& omitRequiredOddPadding(bool omit) { omitRequiredOddPadding_ = omit; return *this; }
+        WavFixtureBuilder& declareTruncatedDataChunk(std::uint32_t declaredSize) { truncatedDataDeclaredSize_ = declaredSize; hasTruncatedDataDecl_ = true; return *this; }
+        WavFixtureBuilder& appendChunkBeyondRiff(const std::string& id, std::uint32_t oversizeBy) { appendBeyondRiffId_ = id; appendBeyondRiffOversizeBy_ = oversizeBy; hasAppendBeyondRiff_ = true; return *this; }
 
         std::vector<std::uint8_t> build() const;
         void writeToFile(const std::string& path) const;
@@ -77,8 +80,14 @@ namespace lsw::audio_diag::test
         bool omitData_ = false;
         bool breakChunkHeader_ = false;
         bool oddPadding_ = false;
+        bool omitRequiredOddPadding_ = false;
         bool isFloat_ = false;
         std::uint32_t overrideRiffSize_ = 0xFFFFFFFF;
+        bool hasTruncatedDataDecl_ = false;
+        std::uint32_t truncatedDataDeclaredSize_ = 0;
+        bool hasAppendBeyondRiff_ = false;
+        std::string appendBeyondRiffId_;
+        std::uint32_t appendBeyondRiffOversizeBy_ = 0;
         
         struct ExtraChunk {
             std::string id;

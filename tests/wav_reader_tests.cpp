@@ -470,12 +470,13 @@ namespace lsw::audio_diag::test
             LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::malformed_file));
         }
 
-        // Truncated Data Payload
+        // Truncated Data Payload (data chunk declares N bytes, actual payload < N)
         {
             TestFileGuard guard("test_inv_trunc_data.wav");
             WavFixtureBuilder builder;
+            // Write 2 bytes of actual data, but declare 1000 bytes in data chunk header
             builder.setChannels(1).setBitsPerSample(16).addSample(static_cast<std::int16_t>(100));
-            builder.setDeclaredRiffSize(100); // Declared RIFF size 100 bytes, but file truncated
+            builder.declareTruncatedDataChunk(1000);
             builder.writeToFile(guard.path);
 
             WavReader reader;
@@ -484,11 +485,13 @@ namespace lsw::audio_diag::test
         }
 
         // Unknown Chunk Beyond RIFF End
+        // chunk header is within RIFF boundary but chunk size overruns it
         {
             TestFileGuard guard("test_inv_chunk_beyond_riff.wav");
             WavFixtureBuilder builder;
             builder.setChannels(1).setBitsPerSample(16).addSample(static_cast<std::int16_t>(100));
-            builder.setDeclaredRiffSize(12); // Declared RIFF size 12 (ends before fmt chunk)
+            // Append a chunk whose declared size pushes padded end past RIFF boundary
+            builder.appendChunkBeyondRiff("xtra", 500);
             builder.writeToFile(guard.path);
 
             WavReader reader;
@@ -496,17 +499,18 @@ namespace lsw::audio_diag::test
             LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::malformed_file));
         }
 
-        // Missing Odd Padding
+        // Missing Odd Padding - odd-sized chunk without required padding byte => malformed
         {
             TestFileGuard guard("test_inv_missing_odd_padding.wav");
             WavFixtureBuilder builder;
+            // PCM8 mono, 1 sample = 1 byte data => odd-sized, padding REQUIRED
             builder.setChannels(1).setBitsPerSample(8).addSample(static_cast<std::uint8_t>(100));
-            builder.setOddPadding(true); // Claims odd padding required
+            builder.omitRequiredOddPadding(true);
             builder.writeToFile(guard.path);
 
             WavReader reader;
             auto res = reader.open(guard.path);
-            LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::success));
+            LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::malformed_file));
         }
 
         // RF64 / RIFX
