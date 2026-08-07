@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## 0.3.0 - Unreleased
+## 0.3.0 - 2026-08-07
 
 - Added Offline WAV Analyzer CLI (`lsw_audio_diagnostics_cli`) that outputs deterministic JSON reports.
 - Added streaming WAV reader supporting PCM (8/16/24/32-bit) and IEEE Float (32/64-bit) with `WAVE_FORMAT_EXTENSIBLE` support.
