@@ -14,8 +14,34 @@
 #include <fstream>
 #include <system_error>
 #include <exception>
+#include <limits>
 
 namespace fs = std::filesystem;
+
+namespace
+{
+    fs::path getUniqueSiblingPath(const fs::path& basePath, const std::string& extension)
+    {
+        std::error_code ec;
+        fs::path parent = basePath.parent_path();
+        std::string filename = basePath.filename().string();
+        std::uint32_t counter = 0;
+
+        while (counter < 10000)
+        {
+            std::string candidateName = filename + "." + extension + "." + std::to_string(counter);
+            fs::path candidate = parent.empty() ? fs::path(candidateName) : (parent / candidateName);
+            if (!fs::exists(candidate, ec))
+            {
+                return candidate;
+            }
+            ++counter;
+        }
+
+        std::string defaultName = filename + "." + extension;
+        return parent.empty() ? fs::path(defaultName) : (parent / defaultName);
+    }
+}
 
 int main(int argc, char** argv)
 {
@@ -149,27 +175,29 @@ int main(int argc, char** argv)
         model.analysis = analyzer.getSnapshot();
 
         std::string json = lsw::audio_diag::offline::generateJsonReport(model, pretty);
+        if (json.size() > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max()))
+        {
+            std::cerr << "Error: JSON report size exceeds stream write limit\n";
+            return 6;
+        }
+        std::streamsize jsonWriteSize = static_cast<std::streamsize>(json.size());
 
         if (hasOutput)
         {
             fs::path outPath(outputPath);
-            fs::path tempPath = outPath.parent_path() / (outPath.filename().string() + ".tmp");
-            fs::path backupPath = outPath.parent_path() / (outPath.filename().string() + ".bak");
-            if (outPath.parent_path().empty()) {
-                tempPath = outPath.string() + ".tmp";
-                backupPath = outPath.string() + ".bak";
-            }
+            fs::path tempPath = getUniqueSiblingPath(outPath, "tmp");
+            fs::path backupPath = getUniqueSiblingPath(outPath, "bak");
 
             std::ofstream out(tempPath, std::ios::binary);
             if (!out)
             {
-                std::cerr << "Error: Failed to create output file\n";
+                std::cerr << "Error: Failed to create temporary output file\n";
                 return 6;
             }
 
-            out.write(json.data(), json.size());
+            out.write(json.data(), jsonWriteSize);
             out.flush();
-            if (!out)
+            if (!out || out.fail())
             {
                 std::cerr << "Error: Failed to write output file\n";
                 out.close();
@@ -177,11 +205,16 @@ int main(int argc, char** argv)
                 return 6;
             }
             out.close();
+            if (out.fail())
+            {
+                std::cerr << "Error: Failed to close temporary output file\n";
+                fs::remove(tempPath, ec);
+                return 6;
+            }
 
             bool backupCreated = false;
             if (fs::exists(outPath, ec))
             {
-                fs::remove(backupPath, ec);
                 fs::rename(outPath, backupPath, ec);
                 if (ec)
                 {
@@ -198,7 +231,12 @@ int main(int argc, char** argv)
                 std::cerr << "Error: Failed to replace output file\n";
                 if (backupCreated)
                 {
-                    fs::rename(backupPath, outPath, ec);
+                    std::error_code restoreEc;
+                    fs::rename(backupPath, outPath, restoreEc);
+                    if (restoreEc)
+                    {
+                        std::cerr << "Error: Rollback failed to restore original output file\n";
+                    }
                 }
                 fs::remove(tempPath, ec);
                 return 6;
@@ -211,8 +249,13 @@ int main(int argc, char** argv)
         }
         else
         {
-            std::cout << json;
+            std::cout.write(json.data(), jsonWriteSize);
             std::cout.flush();
+            if (std::cout.fail())
+            {
+                std::cerr << "Error: Failed to write output to stdout\n";
+                return 6;
+            }
         }
 
         return 0;
