@@ -135,12 +135,12 @@ if(NOT r_rep EQUAL 0 OR rep_content STREQUAL "stale_content" OR NOT rep_content 
     set(TEST_FAILED TRUE)
 endif()
 
-# 15. failure rollback / original file preservation
+# 15. pre-output failure preserves existing output file
 file(WRITE orig_out.json "original_content")
 execute_process(COMMAND ${CLI_EXEC} analyze missing_input_file.wav --output orig_out.json RESULT_VARIABLE r_fail)
 file(READ orig_out.json fail_content)
 if(NOT r_fail EQUAL 3 OR NOT fail_content STREQUAL "original_content")
-    message(WARNING "Test 'RollbackPreserveOriginal' failed")
+    message(WARNING "Test 'PreOutputFailurePreservesExistingOutput' failed")
     set(TEST_FAILED TRUE)
 endif()
 

@@ -6,6 +6,7 @@
 #include <limits>
 #include <cmath>
 #include <string>
+#include <cstdio>
 
 namespace lsw::audio_diag::test
 {
@@ -87,6 +88,141 @@ namespace lsw::audio_diag::test
 
         LSW_CHECK_EQ(compact1, expectedCompact);
 
+        // Exact full golden string verification for pretty
+        std::string expectedPretty =
+            "{\n"
+            "  \"schemaVersion\": 1,\n"
+            "  \"tool\": {\n"
+            "    \"name\": \"lsw_audio_diagnostics_cli\",\n"
+            "    \"version\": \"0.3.0\"\n"
+            "  },\n"
+            "  \"input\": {\n"
+            "    \"path\": \"test/audio.wav\",\n"
+            "    \"fileSizeBytes\": 1024\n"
+            "  },\n"
+            "  \"audio\": {\n"
+            "    \"container\": \"RIFF/WAVE\",\n"
+            "    \"encoding\": \"pcm_s16\",\n"
+            "    \"sampleRate\": 48000,\n"
+            "    \"channelCount\": 1,\n"
+            "    \"bitsPerSample\": 16,\n"
+            "    \"validBitsPerSample\": 16,\n"
+            "    \"frameCount\": 480,\n"
+            "    \"durationSeconds\": 0.01\n"
+            "  },\n"
+            "  \"analysis\": {\n"
+            "    \"processedFrameCount\": 480,\n"
+            "    \"processedBlockCount\": 1,\n"
+            "    \"diagnosticFlags\": [\n"
+            "      \"prepared\"\n"
+            "    ],\n"
+            "    \"channels\": [\n"
+            "      {\n"
+            "        \"samplePeak\": 0.5,\n"
+            "        \"heldPeak\": 0.5,\n"
+            "        \"heldPeakDbfs\": -6.02,\n"
+            "        \"smoothedRms\": 0.353,\n"
+            "        \"rmsDbfs\": -9.03,\n"
+            "        \"dcOffset\": 0,\n"
+            "        \"maximumAbsoluteSample\": 0.5,\n"
+            "        \"clipCount\": 0,\n"
+            "        \"consecutiveClipCount\": 0,\n"
+            "        \"invalidSampleCount\": 0,\n"
+            "        \"nanCount\": 0,\n"
+            "        \"positiveInfinityCount\": 0,\n"
+            "        \"negativeInfinityCount\": 0,\n"
+            "        \"denormalCount\": 0,\n"
+            "        \"isSilent\": false\n"
+            "      }\n"
+            "    ],\n"
+            "    \"stereo\": {\n"
+            "      \"correlation\": 0,\n"
+            "      \"leftRms\": 0,\n"
+            "      \"rightRms\": 0,\n"
+            "      \"channelBalanceDb\": 0,\n"
+            "      \"monoCompatibilityScore\": 0.5,\n"
+            "      \"identicalChannels\": false,\n"
+            "      \"reversedPolarity\": false,\n"
+            "      \"leftOnly\": false,\n"
+            "      \"rightOnly\": false\n"
+            "    },\n"
+            "    \"channelEvents\": [\n"
+            "      {\n"
+            "        \"dropout\": {\n"
+            "          \"active\": false,\n"
+            "          \"latched\": false,\n"
+            "          \"eventCount\": 0,\n"
+            "          \"currentDurationSamples\": 0,\n"
+            "          \"longestDurationSamples\": 0,\n"
+            "          \"lastStartedAtSample\": 0\n"
+            "        },\n"
+            "        \"sustainedClip\": {\n"
+            "          \"active\": false,\n"
+            "          \"latched\": false,\n"
+            "          \"eventCount\": 0,\n"
+            "          \"currentDurationSamples\": 0,\n"
+            "          \"longestDurationSamples\": 0,\n"
+            "          \"lastStartedAtSample\": 0\n"
+            "        },\n"
+            "        \"dcFault\": {\n"
+            "          \"active\": false,\n"
+            "          \"latched\": false,\n"
+            "          \"eventCount\": 0,\n"
+            "          \"currentDurationSamples\": 0,\n"
+            "          \"longestDurationSamples\": 0,\n"
+            "          \"lastStartedAtSample\": 0\n"
+            "        },\n"
+            "        \"invalidBurst\": {\n"
+            "          \"active\": false,\n"
+            "          \"latched\": false,\n"
+            "          \"eventCount\": 0,\n"
+            "          \"currentDurationSamples\": 0,\n"
+            "          \"longestDurationSamples\": 0,\n"
+            "          \"lastStartedAtSample\": 0\n"
+            "        },\n"
+            "        \"maximumObservedDcOffset\": 0,\n"
+            "        \"maximumInvalidSamplesPerBlock\": 0\n"
+            "      }\n"
+            "    ],\n"
+            "    \"stereoEvents\": {\n"
+            "      \"reversedPolarity\": {\n"
+            "        \"active\": false,\n"
+            "        \"latched\": false,\n"
+            "        \"eventCount\": 0,\n"
+            "        \"currentDurationSamples\": 0,\n"
+            "        \"longestDurationSamples\": 0,\n"
+            "        \"lastStartedAtSample\": 0\n"
+            "      },\n"
+            "      \"identicalChannels\": {\n"
+            "        \"active\": false,\n"
+            "        \"latched\": false,\n"
+            "        \"eventCount\": 0,\n"
+            "        \"currentDurationSamples\": 0,\n"
+            "        \"longestDurationSamples\": 0,\n"
+            "        \"lastStartedAtSample\": 0\n"
+            "      },\n"
+            "      \"leftOnly\": {\n"
+            "        \"active\": false,\n"
+            "        \"latched\": false,\n"
+            "        \"eventCount\": 0,\n"
+            "        \"currentDurationSamples\": 0,\n"
+            "        \"longestDurationSamples\": 0,\n"
+            "        \"lastStartedAtSample\": 0\n"
+            "      },\n"
+            "      \"rightOnly\": {\n"
+            "        \"active\": false,\n"
+            "        \"latched\": false,\n"
+            "        \"eventCount\": 0,\n"
+            "        \"currentDurationSamples\": 0,\n"
+            "        \"longestDurationSamples\": 0,\n"
+            "        \"lastStartedAtSample\": 0\n"
+            "      }\n"
+            "    }\n"
+            "  }\n"
+            "}\n";
+
+        LSW_CHECK_EQ(pretty1, expectedPretty);
+
         // Check top-level field order in JSON
         std::size_t posSchema = compact1.find("\"schemaVersion\"");
         std::size_t posTool = compact1.find("\"tool\"");
@@ -111,10 +247,32 @@ namespace lsw::audio_diag::test
             model.input.path = s;
 
             std::string json = generateJsonReport(model, false);
-            // Verify json is valid and contains escaped string
             LSW_CHECK(!json.empty());
-            std::size_t pathPos = json.find("\"path\":");
-            LSW_CHECK(pathPos != std::string::npos);
+
+            // Build expected escape sequence
+            std::string expectedEscape;
+            switch (c)
+            {
+            case 0x08: expectedEscape = "\\b"; break;
+            case 0x09: expectedEscape = "\\t"; break;
+            case 0x0A: expectedEscape = "\\n"; break;
+            case 0x0C: expectedEscape = "\\f"; break;
+            case 0x0D: expectedEscape = "\\r"; break;
+            default:
+                {
+                    char buf[8];
+                    std::snprintf(buf, sizeof(buf), "\\u00%02x", c);
+                    expectedEscape = buf;
+                }
+                break;
+            }
+
+            // Verify expected escape sequence is present in JSON
+            LSW_CHECK(json.find(expectedEscape) != std::string::npos);
+
+            // Verify raw unescaped control character is NOT present in JSON
+            std::string rawControl(1, static_cast<char>(c));
+            LSW_CHECK(json.find(rawControl) == std::string::npos);
         }
     }
 

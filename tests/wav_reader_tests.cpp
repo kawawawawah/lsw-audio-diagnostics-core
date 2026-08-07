@@ -64,6 +64,24 @@ namespace lsw::audio_diag::test
             LSW_CHECK(ch[1][0] < -0.9);
         }
 
+        // PCM16 Mono
+        {
+            TestFileGuard guard("test_pcm16_mono.wav");
+            WavFixtureBuilder builder;
+            builder.setChannels(1).setBitsPerSample(16).addSample(static_cast<std::int16_t>(32767));
+            builder.writeToFile(guard.path);
+
+            WavReader reader;
+            auto res = reader.open(guard.path);
+            LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::success));
+            LSW_CHECK_EQ(res.metadata.channelCount, 1U);
+
+            std::vector<std::vector<double>> ch;
+            auto readRes = reader.readBlock(ch, 10);
+            LSW_CHECK_EQ(static_cast<int>(readRes.status), static_cast<int>(WavReadStatus::success));
+            LSW_CHECK(ch[0][0] > 0.99);
+        }
+
         // PCM16 Stereo
         {
             TestFileGuard guard("test_pcm16_stereo.wav");
@@ -83,7 +101,25 @@ namespace lsw::audio_diag::test
             LSW_CHECK(ch[1][0] < -0.99);
         }
 
-        // PCM24 Mono & Stereo
+        // PCM24 Mono
+        {
+            TestFileGuard guard("test_pcm24_mono.wav");
+            WavFixtureBuilder builder;
+            builder.setChannels(1).setBitsPerSample(24).addSample24(static_cast<std::int32_t>(8388607));
+            builder.writeToFile(guard.path);
+
+            WavReader reader;
+            auto res = reader.open(guard.path);
+            LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::success));
+            LSW_CHECK_EQ(res.metadata.channelCount, 1U);
+
+            std::vector<std::vector<double>> ch;
+            auto readRes = reader.readBlock(ch, 10);
+            LSW_CHECK_EQ(static_cast<int>(readRes.status), static_cast<int>(WavReadStatus::success));
+            LSW_CHECK(ch[0][0] > 0.99);
+        }
+
+        // PCM24 Stereo
         {
             TestFileGuard guard("test_pcm24_stereo.wav");
             WavFixtureBuilder builder;
@@ -102,6 +138,24 @@ namespace lsw::audio_diag::test
             LSW_CHECK_EQ(static_cast<int>(readRes.status), static_cast<int>(WavReadStatus::success));
             LSW_CHECK(ch[0][0] > 0.99);
             LSW_CHECK(ch[1][0] < -0.99);
+        }
+
+        // PCM32 Mono
+        {
+            TestFileGuard guard("test_pcm32_mono.wav");
+            WavFixtureBuilder builder;
+            builder.setChannels(1).setBitsPerSample(32).addSample(static_cast<std::int32_t>(2147483647));
+            builder.writeToFile(guard.path);
+
+            WavReader reader;
+            auto res = reader.open(guard.path);
+            LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::success));
+            LSW_CHECK_EQ(res.metadata.channelCount, 1U);
+
+            std::vector<std::vector<double>> ch;
+            auto readRes = reader.readBlock(ch, 10);
+            LSW_CHECK_EQ(static_cast<int>(readRes.status), static_cast<int>(WavReadStatus::success));
+            LSW_CHECK(ch[0][0] > 0.99);
         }
 
         // PCM32 Stereo
@@ -125,6 +179,24 @@ namespace lsw::audio_diag::test
             LSW_CHECK(ch[1][0] < -0.99);
         }
 
+        // Float32 Mono
+        {
+            TestFileGuard guard("test_float32_mono.wav");
+            WavFixtureBuilder builder;
+            builder.setChannels(1).setBitsPerSample(32).setFloat(true).setFormatTag(3).addSample(0.5f);
+            builder.writeToFile(guard.path);
+
+            WavReader reader;
+            auto res = reader.open(guard.path);
+            LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::success));
+            LSW_CHECK_EQ(res.metadata.channelCount, 1U);
+
+            std::vector<std::vector<double>> ch;
+            auto readRes = reader.readBlock(ch, 10);
+            LSW_CHECK_EQ(static_cast<int>(readRes.status), static_cast<int>(WavReadStatus::success));
+            LSW_CHECK_EQ(ch[0][0], 0.5);
+        }
+
         // Float32 Stereo
         {
             TestFileGuard guard("test_float32_stereo.wav");
@@ -143,6 +215,24 @@ namespace lsw::audio_diag::test
             LSW_CHECK_EQ(static_cast<int>(readRes.status), static_cast<int>(WavReadStatus::success));
             LSW_CHECK_EQ(ch[0][0], 0.5);
             LSW_CHECK_EQ(ch[1][0], -0.5);
+        }
+
+        // Float64 Mono
+        {
+            TestFileGuard guard("test_float64_mono.wav");
+            WavFixtureBuilder builder;
+            builder.setChannels(1).setBitsPerSample(64).setFloat(true).setFormatTag(3).addSample(0.75);
+            builder.writeToFile(guard.path);
+
+            WavReader reader;
+            auto res = reader.open(guard.path);
+            LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::success));
+            LSW_CHECK_EQ(res.metadata.channelCount, 1U);
+
+            std::vector<std::vector<double>> ch;
+            auto readRes = reader.readBlock(ch, 10);
+            LSW_CHECK_EQ(static_cast<int>(readRes.status), static_cast<int>(WavReadStatus::success));
+            LSW_CHECK_EQ(ch[0][0], 0.75);
         }
 
         // Float64 Stereo
@@ -252,18 +342,36 @@ namespace lsw::audio_diag::test
             LSW_CHECK_EQ(static_cast<int>(r3.status), static_cast<int>(WavReadStatus::end_of_stream));
         }
 
-        // Oversized Fmt Chunk (e.g. 64 bytes fmt chunk, extra bytes ignored)
+        // Oversized Fmt Chunk (Well-formed fmt header, chunkSize 100 > 40 bytes)
         {
-            TestFileGuard guard("test_oversized_fmt.wav");
+            TestFileGuard guard("test_oversized_fmt_valid.wav");
             WavFixtureBuilder builder;
-            builder.setChannels(1).setBitsPerSample(16).addSample(static_cast<std::int16_t>(100));
-            builder.addUnknownChunk("fmt ", std::vector<std::uint8_t>(64, 0)); // replaced extra fmt
+            builder.setChannels(1).setBitsPerSample(16).addSample(static_cast<std::int16_t>(1000));
+
+            // Construct a valid fmt chunk followed by 60 extra bytes (total chunkSize 100)
+            std::vector<std::uint8_t> customFmt;
+            customFmt.push_back(0x01); customFmt.push_back(0x00); // formatTag = 1 (PCM)
+            customFmt.push_back(0x01); customFmt.push_back(0x00); // channels = 1
+            customFmt.push_back(0x80); customFmt.push_back(0xBB); customFmt.push_back(0x00); customFmt.push_back(0x00); // sampleRate = 48000
+            customFmt.push_back(0x00); customFmt.push_back(0x77); customFmt.push_back(0x01); customFmt.push_back(0x00); // byteRate = 96000
+            customFmt.push_back(0x02); customFmt.push_back(0x00); // blockAlign = 2
+            customFmt.push_back(0x10); customFmt.push_back(0x00); // bitsPerSample = 16
+            customFmt.resize(100, 0xAA); // Extra padding bytes up to 100 bytes
+
+            builder.addUnknownChunk("fmt ", customFmt);
             builder.omitFmtChunk(true);
             builder.writeToFile(guard.path);
 
             WavReader reader;
             auto res = reader.open(guard.path);
-            LSW_CHECK(res.error != WavReaderError::success); // chunkSize without proper format is malformed
+            LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::success));
+            LSW_CHECK_EQ(res.metadata.channelCount, 1U);
+            LSW_CHECK_EQ(res.metadata.sampleRate, 48000U);
+
+            std::vector<std::vector<double>> ch;
+            auto r = reader.readBlock(ch, 10);
+            LSW_CHECK_EQ(static_cast<int>(r.status), static_cast<int>(WavReadStatus::success));
+            LSW_CHECK_EQ(r.frameCount, 1U);
         }
     }
 
@@ -347,6 +455,58 @@ namespace lsw::audio_diag::test
             WavReader reader;
             auto res = reader.open(guard.path);
             LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::malformed_file));
+        }
+
+        // Truncated Fmt Payload
+        {
+            TestFileGuard guard("test_inv_trunc_fmt.wav");
+            WavFixtureBuilder builder;
+            builder.addUnknownChunk("fmt ", {0x01, 0x00, 0x01, 0x00}); // fmt chunk size 4 (less than 16 required)
+            builder.omitFmtChunk(true);
+            builder.writeToFile(guard.path);
+
+            WavReader reader;
+            auto res = reader.open(guard.path);
+            LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::malformed_file));
+        }
+
+        // Truncated Data Payload
+        {
+            TestFileGuard guard("test_inv_trunc_data.wav");
+            WavFixtureBuilder builder;
+            builder.setChannels(1).setBitsPerSample(16).addSample(static_cast<std::int16_t>(100));
+            builder.setDeclaredRiffSize(100); // Declared RIFF size 100 bytes, but file truncated
+            builder.writeToFile(guard.path);
+
+            WavReader reader;
+            auto res = reader.open(guard.path);
+            LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::malformed_file));
+        }
+
+        // Unknown Chunk Beyond RIFF End
+        {
+            TestFileGuard guard("test_inv_chunk_beyond_riff.wav");
+            WavFixtureBuilder builder;
+            builder.setChannels(1).setBitsPerSample(16).addSample(static_cast<std::int16_t>(100));
+            builder.setDeclaredRiffSize(12); // Declared RIFF size 12 (ends before fmt chunk)
+            builder.writeToFile(guard.path);
+
+            WavReader reader;
+            auto res = reader.open(guard.path);
+            LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::malformed_file));
+        }
+
+        // Missing Odd Padding
+        {
+            TestFileGuard guard("test_inv_missing_odd_padding.wav");
+            WavFixtureBuilder builder;
+            builder.setChannels(1).setBitsPerSample(8).addSample(static_cast<std::uint8_t>(100));
+            builder.setOddPadding(true); // Claims odd padding required
+            builder.writeToFile(guard.path);
+
+            WavReader reader;
+            auto res = reader.open(guard.path);
+            LSW_CHECK_EQ(static_cast<int>(res.error), static_cast<int>(WavReaderError::success));
         }
 
         // RF64 / RIFX
