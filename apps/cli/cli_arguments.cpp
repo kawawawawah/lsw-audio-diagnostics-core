@@ -100,4 +100,19 @@ namespace lsw::audio_diag::cli
 
         return res;
     }
+
+    int mapWavReadStatusToExitCode(lsw::audio_diag::offline::WavReadStatus status)
+    {
+        switch (status)
+        {
+        case lsw::audio_diag::offline::WavReadStatus::success:
+        case lsw::audio_diag::offline::WavReadStatus::end_of_stream:
+            return 0;
+        case lsw::audio_diag::offline::WavReadStatus::read_failed:
+            return 3;
+        case lsw::audio_diag::offline::WavReadStatus::malformed_stream:
+        default:
+            return 4;
+        }
+    }
 }

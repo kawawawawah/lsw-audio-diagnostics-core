@@ -5,6 +5,7 @@
 
 #include <string>
 #include <vector>
+#include "lsw/audio_diag/offline/wav_reader.hpp"
 
 namespace lsw::audio_diag::cli
 {
@@ -49,4 +50,6 @@ namespace lsw::audio_diag::cli
 
     ParseResult parseCliArguments(const std::vector<std::string>& args);
     void printHelp();
+
+    int mapWavReadStatusToExitCode(lsw::audio_diag::offline::WavReadStatus status);
 }

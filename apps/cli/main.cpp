@@ -153,8 +153,15 @@ int main(int argc, char** argv)
             if (readRes.status == lsw::audio_diag::offline::WavReadStatus::end_of_stream) break;
             if (readRes.status != lsw::audio_diag::offline::WavReadStatus::success)
             {
-                std::cerr << "Error: Read failed\n";
-                return 4;
+                if (readRes.status == lsw::audio_diag::offline::WavReadStatus::read_failed)
+                {
+                    std::cerr << "Error: Failed to read input file\n";
+                }
+                else
+                {
+                    std::cerr << "Error: Malformed audio stream\n";
+                }
+                return lsw::audio_diag::cli::mapWavReadStatusToExitCode(readRes.status);
             }
 
             channelPtrs.resize(channels.size());
